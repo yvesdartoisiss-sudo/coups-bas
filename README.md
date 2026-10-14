@@ -12,6 +12,7 @@ on ment, on se piège. Une partie dure 10 à 15 minutes.
 - Messagerie : à tous, à son équipe ou en privé. Équipes secrètes (20 % des gains des coéquipiers), agent double
   possible. Les faux messages (carte ou robots) se signent du nom d'un autre : vérifier coûte 20 pièces.
 - Des robots peuvent compléter la table, et ils bluffent aussi.
+- Mode solo : joue seul contre 3 à 5 robots, sans connexion entre téléphones.
 - Le plus riche gagne.
 
 Un joueur crée le salon (son téléphone sert de serveur, il garde la page ouverte), les autres scannent
