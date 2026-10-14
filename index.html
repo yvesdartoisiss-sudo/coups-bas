@@ -252,7 +252,7 @@ function alive(){return G.players.filter(p=>!p.out)}
 function startGame(){
   G.log=[];G.msgs=[];G.status='play';G.winner=null;G.end=null;
   G.players.forEach(p=>{p.out=false;p.inbox=[]});
-  if(G.game==='bluff')bluffStart();else loupStart();
+  if(G.game==='bluff')bluffStart();else if(G.game==='quiz')quizStart();else loupStart();
 }
 function endGame(winners,txt){
   G.status='end';G.phase={k:'over'};G.end={winners,txt};
@@ -626,6 +626,121 @@ function loupAuto(){
 }
 
 /* =====================================================================
+   QUI A DIT ÇA ?
+   ===================================================================== */
+const QUIZ={facile:[
+  {q:'Le pire cadeau qu’on puisse offrir à Mamie ?',a:['Un tapis de yoga','Une trottinette électrique','Un abonnement Netflix… en coréen']},
+  {q:'Si tu étais un animal pendant une journée, lequel et pourquoi ?',a:['Un chat, pour dormir 20 heures','Un aigle, pour voir la maison d’en haut','Une limace, tranquille']},
+  {q:'La première chose que tu fais avec 1 million d’euros ?',a:['Une piscine remplie de bonbons','J’achète une île','Je rembourse tonton']},
+  {q:'Le métier le plus nul du monde ?',a:['Testeur de chaussettes sales','Compteur de grains de sable','Réveil humain']},
+  {q:'Le plat que tu ne mangerais jamais, même pour 100 € ?',a:['Des choux de Bruxelles froids','Une pizza ananas-thon','Du foie de morue']},
+  {q:'Ton super-pouvoir rêvé ?',a:['Arrêter le temps le lundi matin','Parler aux chats','Être invisible à la cantine']},
+  {q:'La phrase que les parents disent tout le temps ?',a:['Range ta chambre !','On n’est pas à l’hôtel ici','Demande à ta mère']},
+  {q:'Le nom parfait pour un hamster ?',a:['Monsieur Moustache','Turbo','Gérard']},
+  {q:'Ce qu’il ne faut JAMAIS faire à un mariage ?',a:['Prendre le micro','Danser la macarena tout seul','Goûter le gâteau avant les mariés']},
+  {q:'Le pire endroit pour passer ses vacances ?',a:['Un parking','Chez le dentiste','Dans une machine à laver']},
+  {q:'Ce que tu emportes sur une île déserte ?',a:['Un chargeur de téléphone','Mamie','Un pot de pâte à tartiner géant']},
+  {q:'Invente une nouvelle matière à l’école',a:['Cours de sieste','Jeux vidéo avancés','Lancer de crêpes']},
+  {q:'Le pire nom pour un chien ?',a:['Chat','Croquette','Monsieur le Président']},
+  {q:'Ce que des extraterrestres penseraient de notre famille ?',a:['Ils mangent beaucoup trop','Ils crient pour rien','Pourquoi ils se battent pour la télécommande ?']},
+  {q:'La meilleure excuse pour ne pas avoir fait ses devoirs ?',a:['Le chien les a mangés','J’étais en mission secrète','Le Wi-Fi a coupé']},
+  {q:'Si ta vie était un film, quel serait son titre ?',a:['Le retour du canapé','Mission : zéro légume','Fast and Sleepy']},
+  {q:'Le truc le plus bizarre qu’on pourrait trouver dans le frigo ?',a:['Une chaussette','Le téléphone de papa','Un yaourt de 2019']},
+  {q:'Ce que tu dirais au président si tu le croisais ?',a:['On peut faire un selfie ?','Plus de vacances, s’il vous plaît','Vous aimez les crêpes ?']},
+  {q:'Une nouvelle règle obligatoire à la maison ?',a:['Pizza tous les vendredis','Interdit de parler avant le petit-déj','Le chat décide de tout']},
+  {q:'Le dessert parfait ?',a:['Mousse au chocolat à la louche','Crêpe banane chocolat','Glace 12 boules']},
+  {q:'Pourquoi la poule a-t-elle traversé la route ?',a:['Pour fuir le renard','Elle avait rendez-vous','Pour aller chez Mamie']},
+  {q:'Le cri de guerre de la famille ?',a:['À TABLE !','Qui a pris mon chargeur ?!','On est en retard !']},
+  {q:'Ce que fait le chat quand tout le monde dort ?',a:['Il commande des croquettes sur Internet','Il regarde des séries','Il prépare la domination du monde']},
+  {q:'Le pire déguisement possible ?',a:['Une poubelle','Un brocoli géant','Le prof de maths']}],
+ normal:[
+  {q:'La pire chose à dire à un premier rendez-vous ?',a:['Ma mère arrive dans 5 minutes','Tu ressembles à mon ex','Je compte les calories de ton dessert']},
+  {q:'Ce que tu cacherais à ta belle-mère ?',a:['Le prix de mes chaussures','Que j’ai raté son gâteau exprès','Mon historique Netflix']},
+  {q:'La pire excuse pour arriver en retard au travail ?',a:['Mon chat avait besoin de parler','J’ai oublié que je travaillais','Ma voiture boudait']},
+  {q:'Le message à ne JAMAIS envoyer sur le groupe famille ?',a:['Ma déclaration d’impôts','Qui a fini le fromage ?','Une photo du réveillon à 4 h du matin']},
+  {q:'Ton talent caché complètement inutile ?',a:['Imiter un dauphin','Plier un drap-housse','Reconnaître les chips à l’aveugle']},
+  {q:'Ce que tu ferais si tu étais invisible une journée ?',a:['Manger au buffet de l’hôtel','Écouter ce qu’on dit de moi','Faire peur au voisin']},
+  {q:'La pire chose à trouver dans un lit d’hôtel ?',a:['Un dentier','Le numéro de l’ancien client','Une moustache']},
+  {q:'Ce que tu ne dirais jamais à ton patron ?',a:['Je dors en réunion','C’est moi qui vole les stylos','J’ai un entretien ailleurs demain']},
+  {q:'La phrase qui tue l’ambiance d’une soirée ?',a:['On parle politique ?','Bon, demain je travaille','Quelqu’un a vu mes clés ?']},
+  {q:'Le pire nom de restaurant ?',a:['Chez Gastro','L’Indigestion','Le Poulet Triste']},
+  {q:'Le mensonge que tout le monde dit ?',a:['J’ai lu les conditions','J’arrive dans 5 minutes','Je ne bois plus jamais']},
+  {q:'Ce qui rend un repas de famille inoubliable ?',a:['Tonton et sa blague habituelle','Le débat politique au fromage','La chute dans la piscine']},
+  {q:'Le pire tatouage possible ?',a:['Le prénom de son ex','Le code Wi-Fi','Un dauphin qui pleure']},
+  {q:'Ton plan pour devenir riche rapidement ?',a:['Vendre l’air de la montagne','Épouser un milliardaire','Ouvrir un bar à fromages']},
+  {q:'La première chose que tu fais si tu gagnes au loto demain ?',a:['Démissionner en chanson','Racheter le bar du coin','Ne rien dire à personne… sauf à tout le monde']},
+  {q:'La pire idée de cadeau de mariage ?',a:['Un livre sur le divorce','Un aspirateur d’occasion','Une tondeuse']},
+  {q:'Ce que ton téléphone dirait de toi s’il pouvait parler ?',a:['Arrête de me regarder aux toilettes','Tu as 4 000 photos de ton chat','Range-moi, je suis plein']},
+  {q:'La chose la plus honteuse que tu as googlée ?',a:['Comment faire cuire un œuf','Est-ce que les pigeons ont des genoux','Mon propre nom']}]};
+const PROBA={facile:['se perdre dans un supermarché','manger le dernier biscuit sans rien dire','devenir célèbre','rire au mauvais moment','s’endormir devant un film','tricher au Monopoly','parler à ses plantes','survivre à une invasion de zombies','oublier son cartable','adopter 10 chats'],
+  normal:['envoyer un message au mauvais groupe','oublier un anniversaire','finir la soirée en chantant','mentir sur son âge','se faire arnaquer sur Internet','pleurer devant un dessin animé','appeler son ex à 2 h du matin','dépenser tout son salaire en un week-end']};
+const GENERIC=['Aucune idée, mais c’était drôle','La réponse D','Demande à Mamie','Un poulet rôti','Je préfère ne pas répondre 😶'];
+const QBOT={guess:['La {l}, c’est forcément {x} 😂','Qui a écrit « {t} » ?? 🤣','Je parie tout que {x} a écrit la {l}','{x}, avoue, c’est toi la {l} !','Personne n’écrit comme ça à part {x}'],reveal:['JE LE SAVAIS !','Mais non, c’est pas possible 😱','{x}, tu m’as bien eu…','Revanche à la prochaine !']};
+let Q=null;
+const LETTERS='ABCDEFGH';
+function quizStart(){
+  const normal=G.mode==='normal';
+  const plan=[];for(let i=0;i<8;i++)plan.push(i%3===2?'proba':'qui');
+  G.Q=Q={i:0,plan,pool:shuffle([...QUIZ.facile,...(normal?QUIZ.normal:[])]).slice(0,12),ppool:shuffle([...PROBA.facile,...(normal?PROBA.normal:[])]),score:{},found:{},fooled:{},elected:{},cur:null};
+  if(normal){const n=shuffle([...QUIZ.normal]);Q.pool=shuffle([...n.slice(0,4),...shuffle([...QUIZ.facile]).slice(0,2)])}
+  G.players.forEach(p=>{Q.score[p.id]=0;Q.found[p.id]=0;Q.fooled[p.id]=0;Q.elected[p.id]=0});
+  sys('🗯️ Qui a dit ça ? 8 manches. Écris tes réponses, devine qui a écrit quoi… et déguise ton style pour piéger les autres !');
+  qRound();
+}
+const qAll=obj=>G.players.every(x=>obj[x.id]!=null||(!x.bot&&!x.online));
+function qRound(){
+  const k=Q.plan[Q.i];
+  if(k==='qui'){const it=Q.pool.pop()||pick(QUIZ.facile);Q.cur={k,q:it.q,botA:shuffle([...it.a]),answers:{},order:[],guesses:{}};phase('write',120)}
+  else{Q.cur={k,q:'Qui de nous est le plus susceptible de '+(Q.ppool.pop()||pick(PROBA.facile))+' ?',votes:{}};phase('vote',90)}
+}
+function qAnswer(p,txt){if(!G.phase||G.phase.k!=='write'||Q.cur.answers[p.id])return;const t=String(txt||'').trim().slice(0,90);if(!t)return;Q.cur.answers[p.id]=t;if(qAll(Q.cur.answers))qGuessPhase()}
+function qGuessPhase(){Q.cur.order=shuffle(Object.keys(Q.cur.answers));phase('guess',150)}
+function qGuess(p,g){
+  if(!G.phase||G.phase.k!=='guess'||!g||typeof g!=='object')return;const C=Q.cur;const clean={};
+  C.order.forEach((a,i)=>{if(a===p.id)return;const who=g[i];if(P(who)&&who!==p.id)clean[i]=who});
+  C.guesses[p.id]=clean;if(qAll(C.guesses))qReveal();
+}
+function qVote(p,t){if(!G.phase||G.phase.k!=='vote'||!P(t))return;Q.cur.votes[p.id]=t;if(qAll(Q.cur.votes))qReveal()}
+function qReveal(){
+  const C=Q.cur;const d={};G.players.forEach(p=>d[p.id]=0);
+  if(C.k==='qui'){
+    C.order.forEach((author,i)=>{Object.entries(C.guesses).forEach(([g,map])=>{if(g===author||map[i]==null)return;if(map[i]===author){d[g]+=2;Q.found[g]++}else{d[author]+=1;Q.fooled[author]++}})});
+    const best=[...C.order].sort((a,b)=>(d[b]||0)-(d[a]||0))[0];
+    sys(`🗯️ Réponses révélées ! ${C.order.map((a,i)=>`${LETTERS[i]} = ${P(a).name}`).join(' · ')}`);
+  }else{
+    const c={};Object.values(C.votes).forEach(t=>c[t]=(c[t]||0)+1);const m=Math.max(0,...Object.values(c));C.top=Object.keys(c).filter(k=>c[k]===m);
+    Object.entries(C.votes).forEach(([v,t])=>{if(C.top.includes(t))d[v]+=1});C.top.forEach(t=>Q.elected[t]++);
+    sys(`🏅 ${C.top.map(id=>nm(P(id))).join(' et ')} : le plus susceptible de… ${C.q.replace('Qui de nous est le plus susceptible de ','').replace(' ?','')} !`);
+  }
+  Object.entries(d).forEach(([id,x])=>Q.score[id]+=x);C.d=d;
+  phase('reveal',30);
+}
+function qNext(){
+  Q.i++;if(Q.i<Q.plan.length)return qRound();
+  const r=[...G.players].sort((a,b)=>Q.score[b.id]-Q.score[a.id]);const top=Q.score[r[0].id];
+  const by=o=>{const s=[...G.players].sort((a,b)=>o[b.id]-o[a.id]);return o[s[0].id]>0?s[0]:null};
+  Q.titles=[[by(Q.found),'🔍','Le détective',Q.found],[by(Q.fooled),'🎭','Le maître du déguisement',Q.fooled],[by(Q.elected),'🏅','La star du « plus susceptible »',Q.elected]].filter(x=>x[0]).map(([p,e,t,o])=>({id:p.id,e,t,n:o[p.id]}));
+  endGame(r.filter(p=>Q.score[p.id]===top).map(p=>p.id),`${r.filter(p=>Q.score[p.id]===top).map(nm).join(' et ')} gagne avec ${top} points !`);
+}
+function botQuiz(b){
+  const ph=G.phase;const el=Date.now()-ph.start;const C=Q.cur;const others=G.players.filter(x=>x.id!==b.id);
+  if(ph.k==='write'&&!C.answers[b.id]&&el>3000+rnd(9000)){const used=Object.values(C.answers);const a=C.botA.find(x=>!used.includes(x))||pick(GENERIC);qAnswer(b,a);return true}
+  if(ph.k==='guess'){
+    if(!b.qsaid&&el>4000+rnd(10000)&&chance(.5)){b.qsaid=Q.i+1;const i=rnd(C.order.length);say(b.id,'all',pick(QBOT.guess).replace('{l}',LETTERS[i]).replace('{t}',C.answers[C.order[i]]).replace(/\{x\}/g,pick(others).name));return true}
+    if(!C.guesses[b.id]&&el>(G.solo?15000:20000)+rnd(15000)){const g={};C.order.forEach((a,i)=>{if(a!==b.id)g[i]=chance(.3)?a:pick(others).id});qGuess(b,g);return true}
+  }
+  if(ph.k==='vote'&&!C.votes[b.id]&&el>4000+rnd(8000)){qVote(b,pick(G.players).id);return true}
+  if(ph.k==='reveal'&&b.qsaid===Q.i+1&&chance(.04)){b.qsaid=-1;say(b.id,'all',pick(QBOT.reveal).replace('{x}',pick(others).name));return true}
+  return false;
+}
+function quizAuto(){
+  const ph=G.phase;
+  if(ph.k==='write')qGuessPhase();
+  else if(ph.k==='guess'||ph.k==='vote')qReveal();
+  else if(ph.k==='reveal')qNext();
+}
+
+/* =====================================================================
    ACTIONS, HORLOGE, VUES
    ===================================================================== */
 function handleAct(pid,a){
@@ -637,19 +752,24 @@ function handleAct(pid,a){
     say(pid,to,txt);if(G.game==='loup'&&to==='all')lHearChat(p,txt);return sync()}
   if(G.status==='lobby'){
     if(pid!==hostPid)return;
-    if(a.type==='settings'){if(['facile','normal'].includes(a.mode))G.mode=a.mode;if(['bluff','loup'].includes(a.game))G.game=a.game}
+    if(a.type==='settings'){if(['facile','normal'].includes(a.mode))G.mode=a.mode;if(['quiz','loup'].includes(a.game))G.game=a.game}
     if(a.type==='kick'&&a.id!==hostPid){G.players=G.players.filter(x=>x.id!==a.id);for(const [cid,id] of Object.entries(connPid))if(id===a.id){net.send(cid,{t:'err',msg:'L’hôte t’a retiré du salon.'});delete connPid[cid]}}
     if(a.type==='bot'&&G.players.length<8){const used=G.players.map(x=>x.name);const b=BOTS.find(([n])=>!used.includes(n));if(b)addPlayer('bot-'+uid(),b[0],b[1],true)}
-    if(a.type==='start'){const min=G.game==='loup'?5:2;if(G.players.length<min)err(`Il faut au moins ${min} joueurs (ajoute des robots).`);else startGame()}
+    if(a.type==='start'){const min=G.game==='loup'?5:G.game==='quiz'?3:2;if(G.players.length<min)err(`Il faut au moins ${min} joueurs (ajoute des robots).`);else startGame()}
     return sync();
   }
-  if(G.status==='end'){if(a.type==='again'&&pid===hostPid){if(a.game&&['bluff','loup'].includes(a.game))G.game=a.game;G.id=uid();if(G.game==='loup'&&G.players.length<5)while(G.players.length<5){const used=G.players.map(x=>x.name);const b=BOTS.find(([n])=>!used.includes(n));addPlayer('bot-'+uid(),b[0],b[1],true)}startGame()}return sync()}
+  if(G.status==='end'){if(a.type==='again'&&pid===hostPid){if(a.game&&['quiz','loup'].includes(a.game))G.game=a.game;G.id=uid();const need=G.game==='loup'?5:G.game==='quiz'?3:2;if(G.players.length<need)while(G.players.length<need){const used=G.players.map(x=>x.name);const b=BOTS.find(([n])=>!used.includes(n));addPlayer('bot-'+uid(),b[0],b[1],true)}startGame()}return sync()}
   const ph=G.phase;
   if(G.game==='bluff'){
     if(a.type==='action'&&ph.k==='action'&&ph.actor===pid){const e=bAction(p,a);if(e)err(e)}
     else if(a.type==='respond')bRespond(p,{type:a.rtype,c:a.c});
     else if(a.type==='lose'&&ph.k==='lose'&&ph.actor===pid)bKill(p,+a.idx||0,ph.after,ph.why);
     else if(a.type==='exchange'&&ph.k==='exchange'&&ph.actor===pid)bExchange(p,a.keep||[]);
+  }else if(G.game==='quiz'){
+    if(a.type==='qanswer')qAnswer(p,a.txt);
+    else if(a.type==='qguess')qGuess(p,a.g);
+    else if(a.type==='qvote')qVote(p,a.target);
+    else if(a.type==='qnext'&&pid===hostPid&&ph.k==='reveal')qNext();
   }else{
     if(['wolf','seer','witch','guard','cupid'].includes(a.type))lNightAct(p,a);
     else if(a.type==='mayor')lMayorVote(p,a.target);
@@ -664,8 +784,8 @@ function handleAct(pid,a){
 function tick(){
   if(!G||G.status!=='play'||!G.phase)return false;
   let acted=false;
-  for(const b of G.players.filter(x=>x.bot)){if(G.status!=='play')break;if(G.game==='bluff'?botBluff(b):botLoup(b)){acted=true;break}}
-  if(G.status==='play'&&G.phase.deadline&&Date.now()>G.phase.deadline){if(G.game==='bluff')bluffAuto();else loupAuto();acted=true}
+  for(const b of G.players.filter(x=>x.bot)){if(G.status!=='play')break;if(G.game==='bluff'?botBluff(b):G.game==='quiz'?botQuiz(b):botLoup(b)){acted=true;break}}
+  if(G.status==='play'&&G.phase.deadline&&Date.now()>G.phase.deadline){if(G.game==='bluff')bluffAuto();else if(G.game==='quiz')quizAuto();else loupAuto();acted=true}
   return acted;
 }
 function viewFor(pid){
@@ -678,6 +798,19 @@ function viewFor(pid){
   if(G.game==='bluff'&&G.B){
     v.B={turn:G.B.turn,deck:G.B.deck.length,copies:G.B.copies,claims:G.B.claims,reveal:G.B.reveal||null,
       seats:G.players.map(p=>({id:p.id,coins:p.coins,cards:p.cards.map(c=>({dead:c.dead,c:c.dead||p.id===pid||G.status==='end'?c.c:null}))}))};
+  }
+  if(G.game==='quiz'&&G.Q){
+    const Qx=G.Q,C=Qx.cur;const k=ph&&ph.k;
+    const c={k:C.k,q:C.q};
+    if(C.k==='qui'){
+      if(k==='write'){c.done=Object.keys(C.answers);c.myAnswer=C.answers[pid]||null}
+      if(k==='guess'){c.answers=C.order.map(a=>({txt:C.answers[a],mine:a===pid}));c.done=Object.keys(C.guesses);c.myGuess=C.guesses[pid]||null}
+      if(k==='reveal'||G.status==='end'){c.answers=C.order.map(a=>({txt:C.answers[a],author:a}));c.guesses=C.guesses;c.d=C.d||{}}
+    }else{
+      if(k==='vote'){c.done=Object.keys(C.votes);c.myVote=C.votes[pid]||null}
+      if(k==='reveal'||G.status==='end'){c.votes=C.votes;c.top=C.top;c.d=C.d||{}}
+    }
+    v.Q={i:Qx.i,total:Qx.plan.length,score:Qx.score,cur:c,titles:Qx.titles||null};
   }
   if(G.game==='loup'&&G.L){
     const Lx=G.L;const r=me&&me.role;const wolfMe=r==='loup';
@@ -782,9 +915,13 @@ function banner(t){const b=$('#banner');b.innerHTML='';const d=document.createEl
 function buzz(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
 const GAMEINFO={
   bluff:{e:'🎭',n:'Le Bluff',d:'2 personnages secrets. Prétends ce que tu veux… on peut te traiter de menteur. 2 à 8 joueurs, 10-15 min.'},
-  loup:{e:'🐺',n:'Loup-garou',d:'Rôles secrets, nuits de chasse, journées de débats et de votes. 5 à 8 joueurs (robots compris), 15-20 min.'}};
-function gamePicker(sel,attr){return `<div class="games">${Object.entries(GAMEINFO).map(([k,g])=>`<button type="button" class="gpick" ${attr}="${k}" aria-pressed="${sel===k}"><span class="ge">${g.e}</span><span><b>${g.n}</b><span>${g.d}</span></span></button>`).join('')}</div>`}
-function rulesHtml(){return `<details class="rules"><summary>Règles du Loup-garou</summary>
+  loup:{e:'🐺',n:'Loup-garou',d:'Rôles secrets, nuits de chasse, journées de débats et de votes. 5 à 8 joueurs (robots compris), 15-20 min.'},
+  quiz:{e:'🗯️',n:'Qui a dit ça ?',d:'Même question pour tous, réponses anonymes : devine qui a écrit quoi… et déguise ton style. 3 à 8 joueurs, 15 min.'}};
+const PICKABLE=['loup','quiz'];
+function gamePicker(sel,attr){return `<div class="games">${Object.entries(GAMEINFO).filter(([k])=>PICKABLE.includes(k)).map(([k,g])=>`<button type="button" class="gpick" ${attr}="${k}" aria-pressed="${sel===k}"><span class="ge">${g.e}</span><span><b>${g.n}</b><span>${g.d}</span></span></button>`).join('')}</div>`}
+function rulesHtml(){return `<details class="rules"><summary>Règles des jeux</summary>
+  <p><b>🗯️ Qui a dit ça ?</b> Tout le monde répond en secret à la même question. Les réponses s'affichent sans les noms : devine qui a écrit chacune. Bonne devinette : +2 points. Chaque personne qui se trompe sur TA réponse : +1 point pour toi. Donc écris comme quelqu'un d'autre ! Une manche sur trois : « Qui de nous est le plus susceptible de… » (1 point si tu votes comme la majorité). 8 manches, le plus de points gagne.</p>
+  <p><b>🐺 Loup-garou</b></p>
   <p hidden><b>🎭 Le Bluff.</b> Chacun a 2 cartes personnage cachées et 2 pièces. À ton tour, fais UNE action. Certaines demandent un personnage : tu peux l'annoncer même sans l'avoir. N'importe qui peut crier « Menteur ! » : si tu mentais, tu perds une carte. Si tu disais vrai, c'est l'accusateur qui en perd une. Sans carte, tu es éliminé. Le dernier en jeu gagne.</p>
   <ul hidden>${Object.values(CHARS).map(c=>`<li>${c.e} <b>${c.n}</b> : ${c.a}${c.b?` · ${c.b}`:''}</li>`).join('')}<li>Sans personnage : 🪙 Revenu (+1), 👵 Aide de Mamie (+2, un Banquier peut bloquer), 💥 Coup fatal (7 pièces, imparable, obligatoire à 10 pièces).</li></ul>
   <p><b>🌙 La nuit</b>, tout se passe en secret sur les téléphones : les loups choisissent une victime, la Voyante découvre le rôle d'un joueur, et selon les rôles en jeu la Sorcière sauve ou empoisonne, le Salvateur protège, Cupidon lie deux amoureux.</p>
@@ -800,8 +937,8 @@ function renderHome(){
   const H=ui.home;
   const av=AVATARS.map(a=>`<button type="button" aria-pressed="${a===H.av}" data-pickav="${a}">${a}</button>`).join('');
   app.innerHTML=`
-  <header class="hero"><h1 class="logo">Loup-garou<small>DU MANOIR · COUPS BAS</small></h1>
-    <p class="tag">Rôles secrets, nuits de chasse, journées de débats et de mensonges. Entre amis chacun sur son téléphone, ou seul contre des robots. 5 à 8 joueurs, 15-20 min.</p></header>
+  <header class="hero"><h1 class="logo">Coups Bas !<small>LOUP-GAROU · QUI A DIT ÇA ?</small></h1>
+    <p class="tag">Des jeux de soirée pour mentir, accuser et se disputer pour rire. Entre amis chacun sur son téléphone, ou seul contre des robots.</p></header>
   <div class="home">
     <section class="card" id="joinCard" ${code?'':'hidden'}>
       <h2>Rejoindre le salon</h2>
@@ -817,9 +954,10 @@ function renderHome(){
       <div class="stack">
         <label class="field"><span class="label">Ton prénom</span><input id="hName" maxlength="14" value="${esc(prof.name)}" placeholder="Alex" autocomplete="nickname"></label>
         <div class="field"><span class="label">Ton pion</span><div class="avatars">${av}</div></div>
+        <div class="field"><span class="label">Jeu</span>${gamePicker(H.game,'data-hgame')}</div>
         <div class="field"><span class="label">Mode</span><div class="seg"><button type="button" data-mode="facile" aria-pressed="${H.mode==='facile'}">Facile<small>dès 10 ans</small></button><button type="button" data-mode="normal" aria-pressed="${H.mode==='normal'}">Normal<small>plus de rôles, robots plus rusés</small></button></div></div>
         <button class="btn big" id="doCreate">👥 Créer un salon entre amis</button>
-        <div class="field"><span class="label">Ou jouer seul contre</span><div class="seg">${(H.game==='loup'?[4,5,6,7]:[2,3,4,5]).map(n=>`<button type="button" data-bots="${n}" aria-pressed="${H.bots===n}">${n} robots</button>`).join('')}</div></div>
+        <div class="field"><span class="label">Ou jouer seul contre</span><div class="seg">${(H.game==='loup'?[4,5,6,7]:[3,4,5,6]).map(n=>`<button type="button" data-bots="${n}" aria-pressed="${H.bots===n}">${n} robots</button>`).join('')}</div></div>
         <button class="btn big blue" id="doSolo">🤖 Jouer seul</button>
         ${saved&&saved.G&&saved.G.status==='play'?`<button class="btn alt" id="doResume">Reprendre la partie en cours</button>`:''}
       </div>
@@ -833,7 +971,7 @@ function renderHome(){
     const keepNames=()=>{const h=$('#hName');if(h)prof.name=h.value;};
     if(d.pickav){H.av=d.pickav;app.querySelectorAll('[data-pickav]').forEach(x=>x.setAttribute('aria-pressed',x.dataset.pickav===H.av))}
     if(d.mode){H.mode=d.mode;b.parentNode.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))}
-    if(d.hgame){keepNames();store.set('coupsbas-profil',{name:$('#hName').value,av:H.av});H.game=d.hgame;H.bots=H.game==='loup'?5:3;renderHome()}
+    if(d.hgame){keepNames();store.set('coupsbas-profil',{name:$('#hName').value,av:H.av});H.game=d.hgame;H.bots=H.game==='loup'?5:4;renderHome()}
     if(d.bots){H.bots=+d.bots;b.parentNode.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b))}
     if(b.id==='swap'){const j=$('#joinCard'),c=$('#createCard');j.hidden=!j.hidden;c.hidden=!c.hidden;b.textContent=j.hidden?'J’ai un code, je rejoins':'Créer ma propre partie'}
     if(b.id==='doCreate'||b.id==='doSolo'){
@@ -858,7 +996,7 @@ function renderHome(){
 }
 function renderLobby(v){
   const host=myPid===v.host;const link=location.origin+location.pathname+'?salon='+v.code+(LOCAL?'&local=1':'');
-  const min=v.game==='loup'?5:2;
+  const min=v.game==='loup'?5:v.game==='quiz'?3:2;
   app.innerHTML=`
   <div class="top"><span class="brand">Coups Bas !</span><span class="pill">${GAMEINFO[v.game].e} ${GAMEINFO[v.game].n}</span><span class="pill">${v.mode==='facile'?'Facile':'Normal'}</span></div>
   <section class="card" style="text-align:center"><span class="label">Code du salon</span><div class="code">${esc(v.code)}</div><div class="qr" id="qr"></div>
@@ -867,6 +1005,7 @@ function renderLobby(v){
     <h2>Joueurs (${v.players.length}/8)</h2>
     <div class="plist">${v.players.map(p=>`<div class="pl"><span class="dot ${p.online?'':'off'}"></span><span class="av">${p.av}</span><span class="nm">${esc(p.name)}${p.id===myPid?' (toi)':''}${p.id===v.host?' · hôte':''}${p.bot?' · robot':''}</span>${host&&p.id!==v.host?`<button class="btn sm alt" data-kick="${p.id}">Retirer</button>`:''}</div>`).join('')}</div>
     ${host?`<div class="row" style="margin-top:10px"><button class="btn sm alt" data-a="bot" ${v.players.length>=8?'disabled':''}>+ Ajouter un robot 🤖</button></div>
+      <div class="field" style="margin-top:12px"><span class="label">Jeu</span>${gamePicker(v.game,'data-set-game')}</div>
       <div class="field" style="margin-top:10px"><span class="label">Mode</span><div class="seg"><button data-set-mode="facile" aria-pressed="${v.mode==='facile'}">Facile<small>dès 10 ans</small></button><button data-set-mode="normal" aria-pressed="${v.mode==='normal'}">Normal<small>adultes</small></button></div></div>
       <button class="btn big" style="width:100%;margin-top:14px" data-a="start" ${v.players.length<min?'disabled':''}>Lancer ${GAMEINFO[v.game].n}</button>
       <p class="small" style="color:var(--ink-2)">${v.players.length<min?`Il faut au moins ${min} joueurs : ajoute des robots si besoin.`:'Tout le monde est là ? Que le meilleur menteur gagne.'} Garde cette page ouverte : ton téléphone sert de serveur.</p>`
@@ -934,6 +1073,32 @@ function bluffPanel(v){
   return `<section class="panel ${mine?'mine':''}">${h}${timerHtml(v)}</section>
     <div class="cheat" style="margin-top:12px"><b style="color:var(--brass)">Tes cartes</b><div class="hand">${myCards.map(c=>`<div class="char ${c.dead?'dead':''}"><span class="ce">${CHARS[c.c].e}</span><b>${CHARS[c.c].n}</b><span>${CHARS[c.c].a}${CHARS[c.c].b?' · '+CHARS[c.c].b:''}</span></div>`).join('')}</div></div>
     <details class="cheat"><summary>Aide-mémoire des personnages (${v.B.copies} exemplaires de chaque)</summary><table>${Object.entries(CHARS).map(([k,c])=>{const shown=v.B.seats.reduce((s,x)=>s+x.cards.filter(y=>y.dead&&y.c===k).length,0);return `<tr><td>${c.e} <b>${c.n}</b></td><td>${c.a}${c.b?'<br>'+c.b:''}</td><td style="white-space:nowrap">${shown} révélé${shown>1?'s':''}</td></tr>`}).join('')}</table></details>`;
+}
+/* --- Vue de Qui a dit ça ? --- */
+function quizPanel(v){
+  const Qv=v.Q;const ph=v.phase;const C=Qv.cur;let h='',mine=false;
+  const scores=`<div class="seats">${[...v.players].sort((a,b)=>Qv.score[b.id]-Qv.score[a.id]).map(p=>`<div class="seat ${p.id===myPid?'me':''}"><div class="nm"><span class="av">${p.av}</span><span>${esc(p.name)}</span></div><div class="info"><span class="coins">${Qv.score[p.id]} pts</span>${C.done&&C.done.includes(p.id)?' ✓':''}</div></div>`).join('')}</div>`;
+  const qbox=`<div class="role"><span class="re">${C.k==='qui'?'🗯️':'🏅'}</span><span><b>${esc(C.q)}</b><span>Manche ${Qv.i+1}/${Qv.total} · ${C.k==='qui'?'Qui a dit ça ?':'Vote : qui de nous ?'}</span></span></div>`;
+  if(ph.k==='write'){
+    mine=!C.myAnswer;
+    h=C.myAnswer?`<h2>✍️ Réponse envoyée</h2><p>« ${esc(C.myAnswer)} »</p><p class="done">${C.done.length}/${v.players.length} ont répondu… Pendant ce temps, bluffez à voix haute !</p>`
+      :`<h2>✍️ Écris ta réponse</h2><p class="small">Astuce stratégique : écris comme quelqu'un d'autre pour que les autres se trompent (tu gagnes 1 point par personne piégée).</p>
+      <form class="compose" id="ansForm" style="margin-top:8px"><input id="ansIn" maxlength="90" placeholder="Ta réponse…" autocomplete="off" style="flex:1"><button class="btn sm">Envoyer</button></form><p class="done">${C.done.length}/${v.players.length} ont répondu</p>`;
+  }else if(ph.k==='guess'){
+    const g=ui.sel.g||C.myGuess||{};const need=C.answers.filter(a=>!a.mine).length;const filled=Object.keys(g).length;mine=!C.myGuess;
+    h=`<h2>🕵️ Qui a écrit quoi ?</h2><p class="small">Pour chaque réponse, choisis son auteur. Bonne pioche : +2 points. Débattez, accusez, mentez !</p>
+      ${C.answers.map((a,i)=>`<div class="cheat" style="background:var(--cream-2);color:var(--ink);margin-top:8px"><b>${LETTERS[i]}.</b> « ${esc(a.txt)} »${a.mine?' <i>(ta réponse)</i>':`<div class="picks" style="margin-top:6px">${v.players.filter(p=>p.id!==myPid).map(p=>`<button class="chip" data-act="qg" data-i="${i}" data-t="${p.id}" aria-pressed="${g[i]===p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`}</div>`).join('')}
+      <div class="acts"><button class="btn big" data-act="qsend" ${filled<need?'disabled':''}>${C.myGuess?'Mettre à jour mes réponses':'Valider mes réponses'} (${filled}/${need})</button></div>
+      <p class="done">${C.done.length}/${v.players.length} ont validé</p>`;
+  }else if(ph.k==='vote'){
+    mine=!C.myVote;
+    h=`<h2>🏅 Votez !</h2><p class="small">Défendez-vous à voix haute… Ceux qui votent comme la majorité gagnent 1 point.</p><div class="picks">${v.players.map(p=>`<button class="chip" data-act="qv" data-t="${p.id}" aria-pressed="${C.myVote===p.id}">${p.av} ${esc(p.name)}${p.id===myPid?' (toi)':''}</button>`).join('')}</div><p class="done">${C.done.length}/${v.players.length} ont voté</p>`;
+  }else if(ph.k==='reveal'){
+    if(C.k==='qui')h=`<h2>🎉 Révélations</h2>${C.answers.map((a,i)=>`<div class="cheat" style="background:var(--cream-2);color:var(--ink);margin-top:8px"><b>${LETTERS[i]}.</b> « ${esc(a.txt)} »<br><b>→ ${pn(v,a.author)}</b>${(()=>{const n=Object.entries(C.guesses).filter(([gg,map])=>gg!==a.author&&map[i]&&map[i]!==a.author).length;return n?` <span class="small">(a piégé ${n} joueur${n>1?'s':''} : +${n})</span>`:''})()}<div class="small" style="margin-top:4px">${Object.entries(C.guesses).filter(([gg])=>gg!==a.author).map(([gg,map])=>`${pn(v,gg)} ${map[i]===a.author?'✅':`❌ (${map[i]?pn(v,map[i]):'—'})`}`).join(' · ')}</div></div>`).join('')}`;
+    else h=`<h2>🏅 Le village a parlé</h2><div class="verdict"><div class="v">${C.top.map(id=>pn(v,id)).join(' et ')}</div>${esc(C.q.replace('Qui de nous est le plus susceptible de ','Le plus susceptible de '))}</div><p class="small">${Object.entries(C.votes).map(([a,b])=>`${pn(v,a)} → ${pn(v,b)}`).join(' · ')}</p>`;
+    h+=`<p class="small" style="margin-top:8px">Points de la manche : ${v.players.filter(p=>C.d[p.id]).map(p=>`${p.av} +${C.d[p.id]}`).join(' · ')||'aucun'}</p>`+(myPid===v.host?`<div class="acts"><button class="btn big" data-act="qnext">${Qv.i+1>=Qv.total?'Voir le podium 🏆':'Manche suivante ➜'}</button></div>`:'<p class="done">L’hôte passe à la suite.</p>');
+  }
+  return scores+qbox+`<section class="panel ${mine?'mine':''}">${h}${timerHtml(v)}</section>`;
 }
 /* --- Vue du Loup-garou --- */
 const notesKey=v=>'lg-notes-'+v.gid;
@@ -1036,7 +1201,7 @@ function introModal(v){
 function chatHtml(v){
   const meP=pp(v,myPid);const wolf=v.L&&v.L.me&&v.L.me.role==='loup'&&v.status==='play';
   const others=v.players.filter(p=>p.id!==myPid&&!p.bot);
-  const quick=v.game==='bluff'?['Menteur ! 🤥','Je te crois… pour l’instant','Faut éliminer celui qui a le plus de pièces !','Je n’ai pas ce perso, promis 😇','Alliance contre le leader ?']:['Je suis simple villageois 🙏','C’est louche…','Qui a parlé en premier ?','On vote ensemble ?','Arrêtez d’accuser au hasard !'];
+  const quick=v.game==='quiz'?['C’est TOI qui as écrit ça ! 😂','Jamais j’écrirais un truc pareil !','Menteur, je te connais trop bien','Avoue !!','Je vous ai tous eus 😎']:v.game==='bluff'?['Menteur ! 🤥','Je te crois… pour l’instant','Faut éliminer celui qui a le plus de pièces !','Je n’ai pas ce perso, promis 😇','Alliance contre le leader ?']:['Je suis simple villageois 🙏','C’est louche…','Qui a parlé en premier ?','On vote ensemble ?','Arrêtez d’accuser au hasard !'];
   const dead=v.game==='loup'&&meP.out&&v.status==='play';
   return `<div class="chat"><h3>💬 Discussion</h3><div class="msgs" id="msgs">${v.msgs.map(m=>{
     if(!m.from)return `<div class="msg sys">${esc(m.txt)}</div>`;
@@ -1050,18 +1215,19 @@ function renderGame(v){
   document.body.classList.toggle('day',v.game==='loup'&&v.phase&&['day','verdict','mayor'].includes(v.phase.k));
   const top=`<div class="top"><span class="brand">${GAMEINFO[v.game].e} ${GAMEINFO[v.game].n}</span>${v.solo?'<span class="pill">🤖 Solo</span>':`<span class="pill">Salon <b>${esc(v.code)}</b></span>`}${v.game==='loup'?`<span class="pill">${v.phase&&['night'].includes(v.phase.k)?'🌙 Nuit':'☀️ Jour'} <b>${v.L.round}</b></span><span class="pill">${v.players.filter(p=>!p.out).length} vivants</span>`:''}</div>`;
   let body='';
-  if(v.game==='bluff')body=bluffSeats(v)+bluffPanel(v);else body=loupSeats(v)+loupPanel(v);
+  if(v.game==='bluff')body=bluffSeats(v)+bluffPanel(v);else if(v.game==='quiz')body=quizPanel(v);else body=loupSeats(v)+loupPanel(v);
   app.innerHTML=top+statusEl()+body+chatHtml(v)+(v.game==='bluff'?`<div class="log">${v.log.slice(0,6).map(l=>`<div>${esc(l)}</div>`).join('')}</div>`:'')+(v.game==='loup'&&ui.intro!==v.gid?introModal(v):'');
 }
 function renderEnd(v){
   const E=v.end;const won=E.winners.includes(myPid);
   let extra='';
   if(v.game==='loup'&&v.L&&v.L.roles)extra=`<div class="plist">${v.players.map(p=>`<div class="pl"><span class="av">${p.av}</span><span class="nm">${esc(p.name)}</span><span>${ROLES[v.L.roles[p.id]].e} ${ROLES[v.L.roles[p.id]].n}</span>${E.winners.includes(p.id)?'🏆':''}</div>`).join('')}</div>`;
+  if(v.game==='quiz'&&v.Q)extra=`<div class="plist">${[...v.players].sort((a,b)=>v.Q.score[b.id]-v.Q.score[a.id]).map((p,i)=>`<div class="pl"><b>${i+1}</b><span class="av">${p.av}</span><span class="nm">${esc(p.name)}</span><span>${v.Q.score[p.id]} pts</span>${E.winners.includes(p.id)?'🏆':''}</div>`).join('')}</div>${(v.Q.titles||[]).map(t=>`<div class="verdict" style="margin-top:8px">${t.e} <b>${esc(t.t)}</b> : ${pn(v,t.id)} (${t.n})</div>`).join('')}`;
   if(v.game==='bluff'&&v.B)extra=`<div class="plist">${v.players.map(p=>{const s=v.B.seats.find(x=>x.id===p.id);return `<div class="pl"><span class="av">${p.av}</span><span class="nm">${esc(p.name)}</span><span>${s.cards.map(c=>CHARS[c.c].e).join(' ')}</span>${E.winners.includes(p.id)?'🏆':''}</div>`}).join('')}</div>`;
   app.innerHTML=`<div class="top"><span class="brand">Coups Bas !</span></div>
   <section class="card" style="text-align:center"><h2 style="font-size:1.9rem">${won?'🏆 Victoire !':'💀 Perdu…'}</h2><p class="big">${esc(E.txt)}</p>${extra}
     <p class="small" style="margin-top:10px">Victoires : ${v.players.filter(p=>p.wins).map(p=>`${p.av} ${esc(p.name)} ×${p.wins}`).join(' · ')||'—'}</p>
-    ${myPid===v.host?`<div class="acts"><button class="btn big" data-act="again" data-g="${v.game}">Rejouer (nouveaux rôles)</button></div>`:'<p class="small">L’hôte peut relancer une partie.</p>'}
+    ${myPid===v.host?`<div class="acts"><button class="btn big" data-act="again" data-g="${v.game}">Rejouer ${GAMEINFO[v.game].e} ${GAMEINFO[v.game].n}</button><button class="btn alt" data-act="again" data-g="${v.game==='quiz'?'loup':'quiz'}">Passer à ${GAMEINFO[v.game==='quiz'?'loup':'quiz'].e} ${GAMEINFO[v.game==='quiz'?'loup':'quiz'].n}</button></div>`:'<p class="small">L’hôte peut relancer une partie.</p>'}
   </section>${chatHtml(v)}`;
   document.body.classList.remove('day');
 }
@@ -1069,7 +1235,7 @@ function updTimer(){const t=$('#tbar');if(t)t.style.width=Math.max(0,Math.min(10
 setInterval(updTimer,500);
 function render(){
   const v=V;if(!v)return;
-  const keep={};['msgIn','msgTo'].forEach(id=>{const el=document.getElementById(id);if(el)keep[id]=el.value});
+  const keep={};['msgIn','msgTo','ansIn'].forEach(id=>{const el=document.getElementById(id);if(el)keep[id]=el.value});
   const fid=document.activeElement&&document.activeElement.id;const mEl=$('#msgs');const atBottom=!mEl||mEl.scrollHeight-mEl.scrollTop-mEl.clientHeight<40;
   const det=[...document.querySelectorAll('details')].map(d=>d.open);
   if(v.status==='lobby')renderLobby(v);else if(v.status==='end')renderEnd(v);else renderGame(v);
@@ -1109,6 +1275,10 @@ function bindGame(){
       case 'keep':{const i=+d.i;const k=ui.sel.keep||[];ui.sel.keep=k.includes(i)?k.filter(x=>x!==i):[...k,i].slice(-V.phase.keep);render();break}
       case 'doexch':send({type:'exchange',keep:ui.sel.keep});ui.sel={};break;
       case 'wolf':send({type:'wolf',target:d.t});break;
+      case 'qg':{const g={...(ui.sel.g||(V.Q.cur.myGuess)||{})};g[+d.i]=d.t;ui.sel.g=g;render();break}
+      case 'qsend':send({type:'qguess',g:ui.sel.g||V.Q.cur.myGuess||{}});break;
+      case 'qv':send({type:'qvote',target:d.t});break;
+      case 'qnext':send({type:'qnext'});break;
       case 'guard':send({type:'guard',target:d.t});break;
       case 'mayor':send({type:'mayor',target:d.t});break;
       case 'lov':{const l=ui.sel.lov||[];ui.sel.lov=l.includes(d.t)?l.filter(x=>x!==d.t):[...l,d.t].slice(-2);render();break}
@@ -1128,7 +1298,7 @@ function bindGame(){
       case 'again':send({type:'again',game:d.g});break;
     }
   };
-  app.onsubmit=e=>{e.preventDefault();if(e.target.id==='msgForm'){const i=$('#msgIn');const t=i.value.trim();if(t){send({type:'msg',to:$('#msgTo').value,txt:t});i.value=''}}};
+  app.onsubmit=e=>{e.preventDefault();if(e.target.id==='ansForm'){const i=$('#ansIn');const t=i.value.trim();if(t){send({type:'qanswer',txt:t});i.value=''}}if(e.target.id==='msgForm'){const i=$('#msgIn');const t=i.value.trim();if(t){send({type:'msg',to:$('#msgTo').value,txt:t});i.value=''}}};
 }
 (function boot(){
   const s=sstore.get('coupsbas-y-session',null);myPid=sstore.get('coupsbas-y-pid',null);
