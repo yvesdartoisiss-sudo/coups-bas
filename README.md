@@ -1,21 +1,18 @@
-# Coups Bas ! Express
+# Coups Bas !
 
-Jeu de soirée de bluff pour 2 à 8 joueurs, chacun sur son téléphone, dès 10 ans. On parle à voix haute,
-on ment, on se piège. Une partie dure 10 à 15 minutes.
+Deux jeux de bluff pour les soirées entre amis et en famille (dès 10 ans), chacun sur son téléphone,
+ou seul contre des robots.
 
 **Jouer :** https://yvesdartoisiss-sudo.github.io/coups-bas/
 
-- 6 mini-jeux de moins d'une minute, tout le monde joue en même temps : L'Intrus, Qui a mangé le gâteau ?,
-  Partager ou Voler, Le Dé du Menteur, L'Enchère truquée, Le Chiffre unique.
-- Coups bas anonymes à tout moment : Pickpocket, Espion, Bâillon, Gage (accent imposé), Brouillage
-  d'écran, Racket, Quitte ou double, Bouclier, Miroir. Le « grand déballage » révèle tout à la fin.
-- Messagerie : à tous, à son équipe ou en privé. Équipes secrètes (20 % des gains des coéquipiers), agent double
-  possible. Les faux messages (carte ou robots) se signent du nom d'un autre : vérifier coûte 20 pièces.
-- Des robots peuvent compléter la table, et ils bluffent aussi.
-- Mode solo : joue seul contre 3 à 5 robots, sans connexion entre téléphones.
-- Le plus riche gagne.
+- **🎭 Le Bluff** (façon Coup) : 2 personnages secrets (Banquier, Assassin, Voleur, Espion, Comtesse).
+  Annonce le pouvoir que tu veux, même sans l'avoir ; les autres peuvent crier « Menteur ! ».
+  Le dernier en jeu gagne. 2 à 8 joueurs, 10-15 min.
+- **🐺 Loup-garou** : loups, Voyante, Sorcière, Chasseur, villageois. Nuits de chasse, journées de débat
+  et de vote, fausses déclarations de Voyante. 5 à 8 joueurs (robots compris), 15-20 min.
 
-Un joueur crée le salon (son téléphone sert de serveur, il garde la page ouverte), les autres scannent
-le QR code ou tapent le code à 4 lettres.
+Entre amis : un joueur crée le salon (son téléphone sert de serveur, il garde la page ouverte), les autres
+scannent le QR code ou tapent le code à 4 lettres. En solo : pas de chrono, les robots bluffent, comptent
+les cartes, accusent et votent.
 
-L'ancienne version, plus longue (plateau, enquête, achat de pièces), reste jouable : `classique.html`.
+Anciennes versions : `express.html`, `classique.html`.
