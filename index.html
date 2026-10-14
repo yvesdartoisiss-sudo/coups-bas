@@ -201,22 +201,22 @@ const AVATARS=['🦊','🐼','🐸','🦁','🐷','🐵','🦄','🐙','🐔','�
 const BOTS=[['Robot Gaston','🤖'],['Robot Mamie','👾'],['Robot Jade','🦾'],['Robot Firmin','📟'],['Robot Mistigri','🛸']];
 const START=100, MAX_HAND=3, MAX_PLAYERS=8;
 const GAMES={
-  intrus:{n:"L'Intrus",e:'🎭',min:3,secs:80,
+  intrus:{n:"L'Intrus",e:'🎭',min:3,secs:180,
     rule:"Tout le monde a le même mot secret… sauf un intrus, qui a un mot proche et ne sait pas qu'il est l'intrus. Chacun dit UN mot à voix haute, à tour de rôle, puis on vote.",
     tip:"Dis un mot assez vague pour ne pas aider l'intrus… mais pas trop, sinon c'est toi qu'on soupçonne !"},
-  voleur:{n:'Qui a mangé le gâteau ?',e:'🎂',min:3,secs:80,
+  voleur:{n:'Qui a mangé le gâteau ?',e:'🎂',min:3,secs:180,
     rule:"Un joueur a mangé le gâteau de Mamie. Un témoin l'a vu. Discutez à voix haute, puis votez contre le coupable.",
     tip:"Le voleur peut se faire passer pour le témoin. Le vrai témoin doit convaincre sans se faire repérer."},
-  partage:{n:'Partager ou Voler',e:'🤝',min:2,secs:50,
+  partage:{n:'Partager ou Voler',e:'🤝',min:2,secs:100,
     rule:"Vous êtes par deux face à un magot. Les deux partagent : moitié chacun. Un seul vole : il prend tout. Les deux volent : personne n'a rien.",
     tip:"Regarde ton partenaire dans les yeux et promets-lui de partager… ou pas."},
-  menteur:{n:'Le Dé du Menteur',e:'🎲',min:2,secs:40,
+  menteur:{n:'Le Dé du Menteur',e:'🎲',min:2,secs:90,
     rule:"Le conteur voit un dé secret et annonce un chiffre à voix haute, vrai ou faux. Les autres parient : vérité ou mensonge ?",
     tip:"Conteur : chaque mauvais pari te rapporte 40. Parieurs : écoutez sa voix, regardez ses mains…"},
-  enchere:{n:"L'Enchère truquée",e:'💰',min:3,secs:50,
+  enchere:{n:"L'Enchère truquée",e:'💰',min:3,secs:100,
     rule:"Un coffre à vendre. Seul l'expert connaît sa vraie valeur (et il touche 20 % de la vente). Enchérissez en secret : le plus offrant paie et récupère le contenu.",
     tip:"L'expert a tout intérêt à faire monter les prix… Le coffre peut être vide !"},
-  unique:{n:'Le Chiffre unique',e:'🔢',min:2,secs:35,
+  unique:{n:'Le Chiffre unique',e:'🔢',min:2,secs:75,
     rule:"Choisis un chiffre de 1 à 6 en secret. Si personne d'autre n'a pris le même, tu gagnes ce chiffre × 25. Les doublons ne gagnent rien.",
     tip:"Annonce bien fort que tu prends le 6… et prends le 5."}};
 const WORDS={
@@ -288,7 +288,7 @@ function drawTrap(){const pool=Object.entries(TRAPS).filter(([k,v])=>!(G.mode===
 function deal(p,n){for(let i=0;i<n&&p.hand.length<MAX_HAND;i++)p.hand.push(drawTrap())}
 function gain(p,n){if(n>0&&p.fx.double===G.m)n*=2;p.gold+=n;if(n>0)p.stats.won+=n;return n}
 function lose(p,n){const x=Math.min(p.gold,Math.max(0,n));p.gold-=x;return x}
-function phase(k,secs,data={}){G.phase={k,...data,deadline:Date.now()+secs*1000,total:secs}}
+function phase(k,secs,data={}){const free=G.solo;G.phase={k,...data,start:Date.now(),deadline:free?null:Date.now()+secs*1000,total:free?null:secs}}
 function startGame(){
   G.players.forEach(p=>{p.gold=START;p.hand=[];p.fx={};p.inbox=[];p.stats={lies:0,played:0,taken:0,won:0};p.used=-1;deal(p,2)});
   G.feed=[];G.history=[];G.msgs=[];G.teams=[];G.m=0;G.status='play';G.players.forEach(p=>{p.verified={};p.lastMsg=0});
@@ -310,7 +310,7 @@ function startManche(){
   if(g==='menteur'){c.narr=ids[0];c.die=1+rnd(6);c.claim=null}
   if(g==='enchere'){c.expert=ids[0];c.value=Math.random()<.18?0:10*(5+rnd(26))}
   G.cur=c;G.botSaid={};
-  phase('intro',7);
+  phase('intro',45);
 }
 function playPhase(){phase('play',GAMES[G.cur.g].secs);const c=G.cur;
   if(c.g==='intrus')feed(`🎭 Ordre de parole : ${c.order.map(id=>P(id).name).join(' → ')}`);
@@ -331,9 +331,11 @@ function maybeEnd(){
   if(c.g==='menteur'&&c.claim==null)return;
   if(need.every(id=>c.acts[id]!=null)){
     // laisse quelques secondes pour bluffer encore dans les jeux de parole
+    c.allDone=true;
+    if(G.solo)return;
     const left=G.phase.deadline-Date.now();
-    if(['intrus','voleur'].includes(c.g)&&left>6000){G.phase.deadline=Date.now()+6000;G.phase.total=Math.max(G.phase.total,6)}
-    else if(!['intrus','voleur'].includes(c.g))reveal();
+    if(['intrus','voleur'].includes(c.g)){if(left>20000){G.phase.deadline=Date.now()+20000}}
+    else if(left>8000){G.phase.deadline=Date.now()+8000}
   }
 }
 function act(p,a){
@@ -411,7 +413,7 @@ function reveal(){
   G.players.forEach(p=>R.d[p.id]=p.gold-before[p.id]);
   G.teams.forEach(t=>t.members.forEach(mid=>{const m=P(mid);if(!m)return;let b=0;t.members.forEach(o=>{if(o!==mid)b+=Math.max(0,R.d[o]||0)*.2});b=Math.round(b/5)*5;if(b>0){m.gold+=b;tell(m,`🤝 ${t.name} : commission d'équipe +${b}`)}}));
   G.cur.R=R;feed(`${GAMES[g].e} ${R.big}`);
-  phase('reveal',14);
+  phase('reveal',40);
 }
 function nextManche(){G.m++;if(G.m>=G.order.length)return endGame();startManche()}
 function endGame(){
@@ -482,29 +484,29 @@ function botTick(){
       if(!G.botSaid[b.id]&&Math.random()<.12){G.botSaid[b.id]=1;pushMsg(b.id,b.id,'all',fillX(pick(BOT_LINES[c.g]),b.id))}
       botSocial(b);
       if(b.used!==G.m&&b.hand.some(x=>!TRAPS[x].pas)&&Math.random()<.04){const i=b.hand.findIndex(x=>!TRAPS[x].pas);const t=pick(G.players.filter(x=>x.id!==b.id));playTrap(b,i,t.id)}
-      const el=Date.now()-(G.phase.deadline-G.phase.total*1000);
+      const el=Date.now()-G.phase.start;
       const others=G.players.filter(x=>x.id!==b.id).map(x=>x.id);
-      if(c.g==='intrus'&&!c.clues[b.id]&&el>2000+rnd(8000)){const w=b.id===c.und?c.pair[1]:c.pair[0];act(b,{clue:pick(HINTS[w]||['bof'])})}
-      if(c.g==='voleur'&&!c.claims[b.id]&&el>4000&&Math.random()<.2){
+      if(c.g==='intrus'&&!c.clues[b.id]&&el>4000+rnd(16000)){const w=b.id===c.und?c.pair[1]:c.pair[0];act(b,{clue:pick(HINTS[w]||['bof'])})}
+      if(c.g==='voleur'&&!c.claims[b.id]&&el>8000&&Math.random()<.1){
         if(b.id===c.witness&&Math.random()<.85){c.claims[b.id]=c.thief;pushMsg(b.id,b.id,'all',`👀 Je suis le témoin : c'est ${P(c.thief).name} !`)}
         else if(b.id===c.thief&&Math.random()<.7){const t=pick(others);c.claims[b.id]=t;pushMsg(b.id,b.id,'all',Math.random()<.5?`👀 Je suis le témoin : c'est ${P(t).name} !`:`J'ai vu ${P(t).name} avec de la crème sur le nez…`)}
         else if(b.id!==c.thief&&b.id!==c.witness&&Math.random()<.4){const t=pick(others);c.claims[b.id]=t;pushMsg(b.id,b.id,'all',`Je trouve ${P(t).name} bien silencieux…`)}
         else c.claims[b.id]=null;
       }
-      if(c.g==='enchere'&&b.id===c.expert&&!G.botSaid['x'+b.id]&&el>3000){G.botSaid['x'+b.id]=1;const v=Math.random()<.6?c.value+10*(5+rnd(15)):c.value;pushMsg(b.id,b.id,'all',`💰 Je suis l'expert : ce coffre vaut au moins ${v} !`)}
-      if(c.acts[b.id]!=null||Math.random()<.6)return;
+      if(c.g==='enchere'&&b.id===c.expert&&!G.botSaid['x'+b.id]&&el>5000){G.botSaid['x'+b.id]=1;const v=Math.random()<.6?c.value+10*(5+rnd(15)):c.value;pushMsg(b.id,b.id,'all',`💰 Je suis l'expert : ce coffre vaut au moins ${v} !`)}
+      if(c.acts[b.id]!=null||Math.random()<.75||el<8000)return;
       switch(c.g){
-        case 'intrus':{if(el<16000||Object.keys(c.clues).length<Math.min(G.players.length,3))break;
+        case 'intrus':{if(el<(G.solo?40000:30000)||Object.keys(c.clues).length<Math.min(G.players.length,3))break;
           const mine=HINTS[b.id===c.und?c.pair[1]:c.pair[0]]||[];const odd=others.filter(id=>c.clues[id]&&!mine.includes(c.clues[id].toLowerCase()));
           act(b,{vote:pick(odd.length&&Math.random()<.8?odd:others)});break}
-        case 'voleur':{if(el<14000)break;
+        case 'voleur':{if(el<(G.solo?35000:25000))break;
           if(b.id===c.witness)return act(b,{vote:c.thief});
           const tally={};Object.entries(c.claims).forEach(([who,t])=>{if(t&&who!==b.id&&t!==b.id)tally[t]=(tally[t]||0)+(P(who).bot?1:1.5)});
           const best=Object.keys(tally).sort((x,y)=>tally[y]-tally[x])[0];
           act(b,{vote:best&&Math.random()<.75?best:pick(others)});break}
         case 'partage':if(c.pairs.flat().includes(b.id))act(b,{choice:Math.random()<.65?'partage':'vol'});break;
         case 'menteur':if(b.id===c.narr){act(b,{claim:Math.random()<.5?c.die:1+rnd(6)})}else if(c.claim!=null)act(b,{bet:Math.random()<.5?'vrai':'faux'});break;
-        case 'enchere':if(b.id!==c.expert&&el>6000)act(b,{bid:Math.random()<.3?0:Math.min(b.gold,10*(3+rnd(18)))});break;
+        case 'enchere':if(b.id!==c.expert&&el>15000)act(b,{bid:Math.random()<.3?0:Math.min(b.gold,10*(3+rnd(18)))});break;
         case 'unique':act(b,{n:1+rnd(6)});break;
       }
     }
@@ -561,7 +563,7 @@ function handleAct(pid,a){
 function tick(){
   if(!G||G.status!=='play'||!G.phase)return;
   botTick();
-  if(Date.now()>G.phase.deadline){
+  if(G.phase.deadline&&Date.now()>G.phase.deadline){
     if(G.phase.k==='intro')playPhase();else if(G.phase.k==='play')reveal();else if(G.phase.k==='reveal')nextManche();
     sync();return true;
   }
@@ -581,7 +583,7 @@ function viewFor(pid){
   }
   return {
     gid:G.id,code:G.code,solo:!!G.solo,status:G.status,mode:G.mode,manches:G.manches,host:hostPid,m:G.m,
-    game:c?c.g:null,phase:ph?{k:ph.k,left:Math.max(0,(ph.deadline||0)-Date.now()),total:ph.total}:null,
+    game:c?c.g:null,phase:ph?{k:ph.k,left:ph.deadline?Math.max(0,ph.deadline-Date.now()):null,total:ph.total,allDone:!!(c&&c.allDone)}:null,
     players:G.players.map(p=>({id:p.id,name:p.name,av:p.av,gold:p.gold,bot:p.bot,online:p.online,fx:{baillon:!!p.fx.baillon,gage:p.fx.gage||null}})),
     feed:G.feed.slice(0,14),sec,
     msgs:G.msgs.filter(m=>canSee(m,pid)).slice(-40).map(m=>({i:m.i,from:m.from,to:m.to,txt:m.txt,mine:m.real===pid,forged:m.fake&&m.real===pid,notMe:m.from===pid&&m.real!==pid,ok:me&&me.verified?me.verified[m.i]:undefined})),
@@ -872,7 +874,7 @@ function handHtml(v){
 }
 function renderGame(v){
   const me=pp(v,myPid);const G0=GAMES[v.game];const k=v.phase.k;
-  const hurry=k==='play'&&v.phase.left<10000;
+  const hurry=k==='play'&&v.phase.left!=null&&v.phase.left<15000;
   app.innerHTML=`
   <div class="top"><span class="brand">Coups Bas Express</span>${v.solo?'<span class="pill">🤖 Solo</span>':''}<span class="pill">Manche <b>${v.m+1}</b>/${v.manches}</span><span class="pill">${me?me.av:''} <b>${me?me.gold:0}</b> 🪙</span></div>
   ${statusEl()}
@@ -882,8 +884,10 @@ function renderGame(v){
   <div class="game"><section class="card">
     <div class="gtitle"><span class="ge">${G0.e}</span><div><h2>${esc(G0.n)}</h2><span class="sub">${k==='intro'?'Prépare-toi…':k==='play'?(v.solo?'À toi de jouer, les robots bavardent dans les messages':'À vous de jouer, parlez fort !'):'Résultat'}${v.me.dbl&&k!=='reveal'?' · ✖️ gains doublés':''}</span></div></div>
     ${gameBody(v)}
-    <div class="timer ${hurry?'hurry':''}"><i id="tbar"></i></div>
-    ${myPid===v.host?`<div class="hostbar"><button class="btn sm alt" data-act="next">${k==='intro'?'Commencer':k==='play'?'Terminer la manche':v.m+1>=v.manches?'Voir le podium':'Manche suivante'} ➜</button></div>`:''}
+    ${v.phase.total?`<div class="timer ${hurry?'hurry':''}"><i id="tbar"></i></div>`:''}
+    ${myPid===v.host?(k==='play'&&!v.phase.allDone?`<div class="hostbar"><button class="btn sm alt" data-act="next">Terminer la manche ➜</button></div>`
+      :`<div class="hostbar" style="justify-content:center"><button class="btn big" data-act="next">${k==='intro'?'C’est parti ! ▶':k==='play'?'Tout le monde a joué : voir le résultat ➜':v.m+1>=v.manches?'Voir le podium 🏆':'Manche suivante ➜'}</button></div>`)
+     :(k==='intro'?'<p class="done" style="text-align:center">L’hôte lance la manche quand tout le monde a lu.</p>':k==='reveal'?'<p class="done" style="text-align:center">L’hôte passe à la suite quand vous avez fini de rigoler.</p>':'')}
   </section></div>
   ${handHtml(v)}
   ${socialHtml(v)}`;
