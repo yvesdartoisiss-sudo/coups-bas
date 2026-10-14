@@ -162,6 +162,8 @@ button.char{cursor:pointer}
 .banner{position:fixed;inset:0;display:grid;place-items:center;pointer-events:none;z-index:45;overflow:hidden}
 .banner div{font-family:var(--display);font-size:clamp(1.8rem,9vw,4rem);color:var(--brass);text-shadow:0 4px 0 #6d5418,0 0 30px rgba(0,0,0,.7);animation:pop 1.8s ease-out forwards;text-align:center;padding:0 16px;max-width:100%;overflow-wrap:anywhere}
 @keyframes pop{0%{transform:scale(.3) rotate(-8deg);opacity:0}20%{transform:scale(1.08) rotate(-3deg);opacity:1}80%{opacity:1}100%{transform:scale(1) rotate(-3deg);opacity:0}}
+.modal{position:fixed;inset:0;background:rgba(5,3,15,.75);display:grid;place-items:center;z-index:40;padding:16px;overflow:auto}
+.modal .panel{width:100%}
 .err{background:var(--red);color:#fff;border-radius:10px;padding:8px 12px;margin-top:10px}
 .rules{margin-top:16px;background:rgba(0,0,0,.25);border-radius:16px;padding:12px 16px}
 .rules summary{font-family:var(--display);font-size:1.2rem;cursor:pointer;color:var(--brass)}
@@ -215,15 +217,18 @@ const ACTIONS={
   coup:{n:'Coup fatal',e:'💥',d:'Paie 7 : la cible perd une carte. Imparable.',target:1,cost:7}};
 /* ---------------- Loup-garou : données ---------------- */
 const ROLES={
-  loup:{n:'Loup-garou',e:'🐺',d:'Chaque nuit, les loups dévorent un villageois. Le jour, fais-toi passer pour un innocent.',team:'loups'},
-  voyante:{n:'Voyante',e:'🔮',d:'Chaque nuit, découvre le rôle d’un joueur. Attention : te révéler fait de toi une cible.',team:'village'},
-  sorciere:{n:'Sorcière',e:'🧪',d:'Une potion de vie (sauver la victime des loups) et une potion de mort, une fois chacune.',team:'village'},
-  chasseur:{n:'Chasseur',e:'🏹',d:'Si tu meurs, tu emportes quelqu’un avec toi.',team:'village'},
-  villageois:{n:'Villageois',e:'🧑‍🌾',d:'Aucun pouvoir, mais ton vote compte. Démasque les loups !',team:'village'}};
+  loup:{n:'Loup-garou',e:'🐺',team:'loups',d:'Chaque nuit, avec les autres loups, tu dévores un villageois. Le jour, fais-toi passer pour un innocent.',goal:'Gagner : être aussi nombreux que les villageois, sans te faire démasquer.'},
+  voyante:{n:'Voyante',e:'🔮',team:'village',d:'Chaque nuit, tu découvres le vrai rôle d’un joueur.',goal:'Gagner : faire éliminer tous les loups. Attention, si tu te révèles, les loups te viseront.'},
+  sorciere:{n:'Sorcière',e:'🧪',team:'village',d:'Une potion de vie (sauver la victime des loups) et une potion de mort, une seule fois chacune.',goal:'Gagner : faire éliminer tous les loups.'},
+  chasseur:{n:'Chasseur',e:'🏹',team:'village',d:'Si tu meurs, tu tires sur quelqu’un et tu l’emportes avec toi.',goal:'Gagner : faire éliminer tous les loups.'},
+  cupidon:{n:'Cupidon',e:'💘',team:'village',d:'La première nuit, tu désignes deux amoureux. Si l’un meurt, l’autre meurt de chagrin.',goal:'Gagner : faire éliminer tous les loups.'},
+  salvateur:{n:'Salvateur',e:'🛡️',team:'village',d:'Chaque nuit, tu protèges un joueur des loups (jamais deux nuits de suite le même).',goal:'Gagner : faire éliminer tous les loups.'},
+  villageois:{n:'Villageois',e:'🧑‍🌾',team:'village',d:'Pas de pouvoir, mais ton vote compte. Écoute, observe, démasque !',goal:'Gagner : faire éliminer tous les loups.'}};
 function compo(n,mode){
   const r=['loup','voyante'];if(n>=6)r.push('loup');
-  if(mode==='normal'){if(n>=5)r.push('sorciere');if(n>=6)r.push('chasseur')}
-  while(r.length<n)r.push('villageois');return shuffle(r);
+  if(mode==='normal'){if(n>=5)r.push('sorciere');if(n>=6)r.push('chasseur');if(n>=7)r.push('cupidon');if(n>=8)r.push('salvateur')}
+  else if(n>=7)r.push('chasseur');
+  while(r.length<n)r.push('villageois');return shuffle(r.slice(0,n));
 }
 
 /* =====================================================================
@@ -423,124 +428,170 @@ function bluffAuto(){
    LOUP-GAROU
    ===================================================================== */
 let L=null;
+const DEATH_FLAVOR=['a été retrouvé dans le poulailler 🐔.','n’est jamais revenu de sa promenade nocturne 🌲.','a laissé ses pantoufles devant la porte… vides 🥿.','a été dévoré entre deux ronflements 😴.','a ouvert la porte au mauvais visiteur 🚪.'];
+const DEFEND=['Moi ?! Je suis innocent ! C’est plutôt {x} qui détourne l’attention 🤨','{x}, tu accuses bien vite… un peu trop vite.','N’importe quoi ! Regardez plutôt pour qui {x} a voté.','Si vous m’éliminez, vous perdez un innocent. Moi je me méfie de {x}.','Je le jure sur la tête de Mamie, je ne suis pas un loup 🙏','Ha ! Typique d’un loup d’accuser les autres, {x}.'];
+const MORNING=['Pauvre {v} 😢 Qui pouvait lui en vouloir ?','{v}… les loups savent ce qu’ils font.','Il faut trouver qui a fait ça, et vite !','Hier soir {x} était bizarre, je dis ça…'];
+const CHATTER={innocent:['Je suis simple villageois, je vous jure 🙏','Quelqu’un a remarqué quelque chose ?','{x} est bien silencieux aujourd’hui…','On ne vote pas au hasard, hein !','Moi je me méfie de {x}.'],loup:['Je suis villageois, pas de panique.','{x} me paraît suspect, franchement.','Pourquoi {x} accuse tout le monde ?','Votons {x}, on n’a rien de mieux.']};
 function loupStart(){
   const roles=compo(G.players.length,G.mode);
-  G.L=L={round:1,potions:{vie:true,mort:true},seen:{},claims:[],dead:{},night:null,votes:{},sus:{}};
-  G.players.forEach((p,i)=>{p.role=roles[i];L.seen[p.id]={}});
-  const wolves=G.players.filter(p=>p.role==='loup');
-  G.players.forEach(p=>tell(p,`Ton rôle : ${ROLES[p.role].e} ${ROLES[p.role].n}${p.role==='loup'&&wolves.length>1?` (avec ${wolves.filter(w=>w!==p).map(w=>w.name).join(', ')})`:''}`));
-  sys(`🌕 Le village s'endort… ${wolves.length} loup${wolves.length>1?'s se cachent':' se cache'} parmi vous.`);
+  G.L=L={round:1,potions:{vie:true,mort:true},seen:{},claims:[],dead:{},night:null,votes:{},mvotes:{},mayor:null,lovers:null,lastGuard:null,hist:[],hunted:[],replies:[],lastDeaths:[],justDied:[]};
+  G.players.forEach((p,i)=>{p.role=roles[i];L.seen[p.id]={};p.talked=0;p.grudge=null;p.reacted=0});
+  const wolves=G.players.filter(isWolf);
+  G.players.forEach(p=>tell(p,`Ton rôle : ${ROLES[p.role].e} ${ROLES[p.role].n}${isWolf(p)&&wolves.length>1?` (avec ${wolves.filter(w=>w!==p).map(w=>w.name).join(', ')})`:''}`));
+  sys(`🌕 Le village s'endort… ${wolves.length} loup${wolves.length>1?'s se cachent':' se cache'} parmi vous. Rôles en jeu : ${[...new Set(roles)].map(r=>ROLES[r].e+' '+ROLES[r].n).join(', ')}.`);
   lNight();
 }
-const isWolf=p=>p.role==='loup';
-function lNight(){L.night={wolf:{},seer:null,witch:null,witchDone:false,save:false,poison:null};phase('night',75)}
-function lWolfTarget(){const v=Object.values(L.night.wolf);if(!v.length)return null;const c={};v.forEach(x=>c[x]=(c[x]||0)+1);const m=Math.max(...Object.values(c));return pick(Object.keys(c).filter(k=>c[k]===m))}
+const isWolf=p=>!!p&&p.role==='loup';
+function lNight(){L.night={wolf:{},seer:null,witchDone:false,save:false,poison:null,guard:null,cupid:false};phase('night',90)}
+function lWolfTarget(){const v=Object.values(L.night.wolf);if(!v.length)return null;const c={};v.forEach(x=>c[x]=(c[x]||0)+1);const m=Math.max(...Object.values(c));const top=Object.keys(c).filter(k=>c[k]===m);return top.sort()[0]}
+const hasRole=r=>alive().find(p=>p.role===r);
+const cupidPending=()=>L.round===1&&!L.lovers&&hasRole('cupidon');
 function lNightReady(){
-  const al=alive();const N=L.night;
-  const wolvesDone=al.filter(isWolf).every(w=>N.wolf[w.id]);
-  const seer=al.find(p=>p.role==='voyante');const witch=al.find(p=>p.role==='sorciere');
-  return wolvesDone&&(!seer||N.seer)&&(!witch||N.witchDone);
+  const N=L.night;const wolvesDone=alive().filter(isWolf).every(w=>N.wolf[w.id]);
+  return wolvesDone&&(!hasRole('voyante')||N.seer)&&(!hasRole('sorciere')||N.witchDone)&&(!hasRole('salvateur')||N.guard)&&(!cupidPending()||N.cupid);
 }
 function lNightAct(p,a){
-  const N=L.night;if(G.phase.k!=='night'||p.out)return;
+  const N=L.night;if(!G.phase||G.phase.k!=='night'||p.out)return;
   const t=a.target?P(a.target):null;
   if(p.role==='loup'&&a.type==='wolf'&&t&&!t.out&&!isWolf(t)){N.wolf[p.id]=t.id;G.players.filter(w=>isWolf(w)&&!w.out&&w.id!==p.id).forEach(w=>tell(w,`🐺 ${p.name} veut dévorer ${t.name}.`))}
   if(p.role==='voyante'&&a.type==='seer'&&t&&!t.out&&t.id!==p.id&&!N.seer){N.seer=t.id;L.seen[p.id][t.id]=t.role;tell(p,`🔮 ${t.name} est ${ROLES[t.role].e} ${ROLES[t.role].n}.`)}
+  if(p.role==='salvateur'&&a.type==='guard'&&t&&!t.out&&t.id!==L.lastGuard&&!N.guard){N.guard=t.id;tell(p,`🛡️ Tu protèges ${t.name} cette nuit.`)}
+  if(p.role==='cupidon'&&a.type==='cupid'&&cupidPending()){const x=P(a.a),y=P(a.b);if(x&&y&&x!==y&&!x.out&&!y.out){L.lovers=[x.id,y.id];N.cupid=true;
+    tell(x,`💘 Cupidon t'a lié à ${y.name}. Si l'un meurt, l'autre aussi.`);tell(y,`💘 Cupidon t'a lié à ${x.name}. Si l'un meurt, l'autre aussi.`);if(x!==p&&y!==p)tell(p,`💘 ${x.name} et ${y.name} sont amoureux.`);sys('💘 Cupidon a décoché ses flèches… deux joueurs sont désormais amoureux.')}}
   if(p.role==='sorciere'&&a.type==='witch'&&!N.witchDone){
-    const wolvesDone=alive().filter(isWolf).every(w=>N.wolf[w.id]);if(!wolvesDone)return;
+    if(!alive().filter(isWolf).every(w=>N.wolf[w.id]))return;
     if(a.save&&L.potions.vie){N.save=true;L.potions.vie=false}
     if(a.poison&&L.potions.mort){const q=P(a.poison);if(q&&!q.out){N.poison=q.id;L.potions.mort=false}}
     N.witchDone=true;
   }
   if(lNightReady())lDawn();
 }
-function lDawn(){
-  const N=L.night;const deaths=[];const v=lWolfTarget();
-  if(v&&!N.save)deaths.push(v);
-  if(N.poison&&!deaths.includes(N.poison))deaths.push(N.poison);
-  L.lastDeaths=deaths;
-  deaths.forEach(id=>lKill(P(id)));
-  sys(deaths.length?`☀️ Le jour se lève. ${deaths.map(id=>{const p=P(id);return `${nm(p)} est mort (${ROLES[p.role].e} ${ROLES[p.role].n})`}).join(' · ')}.`:'☀️ Le jour se lève… et personne n’est mort cette nuit !');
-  log(deaths.length?`Nuit ${L.round} : ${deaths.map(id=>P(id).name).join(', ')} mort(s).`:`Nuit ${L.round} : aucun mort.`);
-  if(lWin())return;
-  const hunter=deaths.map(P).find(p=>p.role==='chasseur');
-  if(hunter)return phase('hunter',30,{actor:hunter.id,then:'day'});
-  lDay();
+function deathText(d){const p=P(d.id);const r=ROLES[p.role];
+  const how=d.cause==='loups'?pick(DEATH_FLAVOR):d.cause==='poison'?'est mort empoisonné 🧪.':d.cause==='amour'?'meurt de chagrin 💔.':d.cause==='chasseur'?'reçoit la flèche du chasseur 🏹.':'est éliminé par le village ⚖️.';
+  return `${nm(p)} ${how} C'était ${r.e} ${r.n} !`}
+function lKill(p,cause){
+  if(!p||p.out)return;p.out=true;L.dead[p.id]=p.role;L.justDied.push({id:p.id,cause,role:p.role});
+  if(L.lovers&&L.lovers.includes(p.id)){const o=P(L.lovers.find(x=>x!==p.id));if(o&&!o.out)lKill(o,'amour')}
+  if(L.mayor===p.id){const al=alive();L.mayor=al.length?pick(al).id:null;if(L.mayor)L.mayorNote=`🎖️ ${nm(p)} lègue l'écharpe de Maire à ${nm(P(L.mayor))}.`}
 }
-function lKill(p){p.out=true;L.dead[p.id]=p.role}
-function lDay(){L.votes={};L.claims=L.claims.filter(c=>c.round===L.round);phase('day',240,{})}
+function afterDeaths(then){
+  if(L.mayorNote){sys(L.mayorNote);L.mayorNote=null}
+  if(lWin())return;
+  const h=L.justDied.map(d=>P(d.id)).find(p=>p.role==='chasseur'&&!L.hunted.includes(p.id));
+  if(h){L.hunted.push(h.id);return phase('hunter',30,{actor:h.id,then})}
+  if(then==='day')return lDay();
+  if(then==='verdict')return phase('verdict',25,{});
+  L.round++;lNight();
+}
+function lDawn(){
+  const N=L.night;const v=lWolfTarget();L.justDied=[];
+  const saved=v&&(N.save||N.guard===v);
+  if(v&&!saved)lKill(P(v),'loups');
+  if(N.poison)lKill(P(N.poison),'poison');
+  if(N.guard)L.lastGuard=N.guard;
+  const all=[...L.justDied];L.lastDeaths=all.map(d=>d.id);
+  L.hist.push({round:L.round,kind:'nuit',deaths:all});
+  sys(all.length?'☀️ Le jour se lève. '+all.map(deathText).join(' '):`☀️ Le jour se lève… et personne n'est mort cette nuit !${saved?' Quelqu’un a été sauvé de justesse ✨':''}`);
+  log(all.length?`Nuit ${L.round} : ${all.map(d=>P(d.id).name).join(', ')} mort(s).`:`Nuit ${L.round} : aucun mort.`);
+  afterDeaths('day');
+}
+function lDay(){
+  L.votes={};G.players.forEach(p=>{p.reacted=0});
+  if(L.round===1&&!L.mayor&&alive().length>=4){L.mvotes={};return phase('mayor',120,{})}
+  phase('day',240,{});
+}
+function lMayorVote(p,t){if(!G.phase||G.phase.k!=='mayor'||p.out)return;const q=P(t);if(!q||q.out)return;L.mvotes[p.id]=t;
+  if(alive().every(x=>L.mvotes[x.id]||(!x.bot&&!x.online)))lMayorDone()}
+function lMayorDone(){const c={};Object.values(L.mvotes).forEach(t=>c[t]=(c[t]||0)+1);const m=Math.max(0,...Object.values(c));const top=Object.keys(c).filter(k=>c[k]===m);
+  const id=top.length?pick(top):pick(alive()).id;L.mayor=id;sys(`🎖️ ${nm(P(id))} est élu Maire ! Son vote compte double et départage les égalités.`);phase('day',240,{})}
 function lWin(){
   const al=alive();const w=al.filter(isWolf).length,o=al.length-w;
   if(w===0){endGame(G.players.filter(p=>!isWolf(p)).map(p=>p.id),'Le village a éliminé tous les loups !');return true}
   if(w>=o){endGame(G.players.filter(isWolf).map(p=>p.id),'Les loups-garous ont dévoré le village !');return true}
   return false;
 }
-function lVote(p,t){if(G.phase.k!=='day'||p.out)return;if(t!=='none'&&(!P(t)||P(t).out||t===p.id))return;L.votes[p.id]=t;
+function lVote(p,t){if(!G.phase||G.phase.k!=='day'||p.out)return;if(t!=='none'&&(!P(t)||P(t).out||t===p.id))return;L.votes[p.id]=t;
   if(alive().every(q=>L.votes[q.id]!=null||(!q.bot&&!q.online)))lVerdict()}
 function lVerdict(){
-  const c={};Object.values(L.votes).forEach(t=>{if(t!=='none')c[t]=(c[t]||0)+1});
+  const c={};Object.entries(L.votes).forEach(([v,t])=>{if(t!=='none')c[t]=(c[t]||0)+(v===L.mayor?2:1)});
   const m=Math.max(0,...Object.values(c));const top=Object.keys(c).filter(k=>c[k]===m);
-  const out=m>0&&top.length===1?P(top[0]):null;
-  L.lastVote={votes:{...L.votes},out:out?out.id:null};
-  if(out){lKill(out);sys(`⚖️ Le village élimine ${nm(out)} : c'était ${ROLES[out.role].e} ${ROLES[out.role].n} !`);log(`Jour ${L.round} : ${out.name} éliminé (${ROLES[out.role].n}).`)}
-  else{sys('⚖️ Égalité : personne n’est éliminé aujourd’hui.')}
-  if(lWin())return;
-  phase('verdict',20,{});
+  let out=null;if(m>0){if(top.length===1)out=top[0];else if(L.mayor&&top.includes(L.votes[L.mayor]))out=L.votes[L.mayor]}
+  L.lastVote={votes:{...L.votes},out,mayor:L.mayor,tie:m>0&&top.length>1};
+  L.hist.push({round:L.round,kind:'vote',votes:{...L.votes},out,mayor:L.mayor});
+  L.justDied=[];
+  if(out){lKill(P(out),'vote');sys('⚖️ '+L.justDied.map(deathText).join(' '));log(`Jour ${L.round} : ${P(out).name} éliminé (${ROLES[P(out).role].n}).`)}
+  else sys(m>0?'⚖️ Égalité ! Personne n’est éliminé aujourd’hui.':'⚖️ Personne n’a voté contre quelqu’un : pas d’élimination.');
+  afterDeaths('verdict');
 }
-function lAfterVerdict(){
-  const out=L.lastVote&&L.lastVote.out?P(L.lastVote.out):null;
-  if(out&&out.role==='chasseur'&&!L.hunted)return phase('hunter',30,{actor:out.id,then:'night'});
-  L.round++;lNight();
-}
+function lAfterVerdict(){L.round++;lNight()}
 function lHunt(p,t){
-  const q=P(t);if(G.phase.k!=='hunter'||G.phase.actor!==p.id||!q||q.out)return;
-  const then=G.phase.then;lKill(q);sys(`🏹 Le chasseur ${nm(p)} emporte ${nm(q)} : c'était ${ROLES[q.role].e} ${ROLES[q.role].n} !`);
-  if(lWin())return;
-  if(then==='day')lDay();else{L.round++;lNight()}
+  const q=P(t);if(!G.phase||G.phase.k!=='hunter'||G.phase.actor!==p.id||!q||q.out)return;
+  const then=G.phase.then;L.justDied=[];lKill(q,'chasseur');sys('🏹 '+L.justDied.map(deathText).join(' '));
+  afterDeaths(then);
 }
 function lClaim(p,a){
-  if(G.phase.k!=='day'||p.out)return;const t=P(a.target);if(!t||t.out||t.id===p.id)return;
+  if(!G.phase||!['day','mayor'].includes(G.phase.k)||p.out)return;const t=P(a.target);if(!t||t.out||t.id===p.id)return;
   if(a.kind==='voyante'){const r=a.role==='loup'?'loup':'innocent';L.claims.push({by:p.id,t:t.id,kind:'voyante',r,round:L.round});say(p.id,'all',`🔮 Je suis la Voyante : ${t.name} est ${r==='loup'?'un LOUP-GAROU 🐺':'innocent 😇'} !`)}
   else{L.claims.push({by:p.id,t:t.id,kind:'accuse',round:L.round});say(p.id,'all',`👉 J'accuse ${t.name} !`)}
+  if(t.bot&&(a.kind==='accuse'||a.role==='loup'))L.replies.push({bot:t.id,to:p.id,at:Date.now()+2500+rnd(3500)});
+}
+function lHearChat(p,txt){
+  if(!G.L||G.status!=='play'||!G.phase||!['day','mayor'].includes(G.phase.k)||p.out)return;
+  const low=txt.toLowerCase();if(!/(loup|louche|ment|suspect|coupable|vot|élimin|elimin|accus|bizarre)/.test(low))return;
+  alive().filter(b=>b.bot&&b.id!==p.id&&low.includes(b.name.toLowerCase())).forEach(b=>{L.claims.push({by:p.id,t:b.id,kind:'accuse',round:L.round,silent:true});if(!L.replies.some(r=>r.bot===b.id))L.replies.push({bot:b.id,to:p.id,at:Date.now()+2000+rnd(3000)})});
 }
 /* --- Robots du Loup-garou --- */
-const BOT_DAY={innocent:['Je suis simple villageois, je vous jure 🙏','Quelqu’un a vu quelque chose cette nuit ?','{x} est bien calme aujourd’hui…','On ne vote pas au hasard, hein !','Moi je me méfie de {x}.'],loup:['Je suis villageois, pas de panique.','{x} me paraît suspect, franchement.','Pourquoi {x} accuse tout le monde ?','Votons {x}, on n’a rien de mieux.']};
 function botLoup(b){
-  const ph=G.phase;const el=Date.now()-ph.start;if(b.out)return false;
+  const ph=G.phase;const el=Date.now()-ph.start;
+  if(ph.k==='hunter'&&ph.actor===b.id&&el>1500){const s=topSuspect(b)||pick(alive()).id;lHunt(b,s);return true}
+  if(b.out)return false;
   const others=alive().filter(x=>x.id!==b.id);
-  const fill=t=>t.replace('{x}',()=>pick(others).name);
+  const fill=t=>t.replace(/\{x\}/g,()=>pick(others).name);
   if(ph.k==='night'&&el>1500+rnd(3000)){
     const N=L.night;
     if(isWolf(b)&&!N.wolf[b.id]){
-      const mate=Object.values(N.wolf)[0];
-      const seerClaim=L.claims.filter(c=>c.kind==='voyante').map(c=>P(c.by)).find(p=>p&&!p.out&&!isWolf(p));
-      const prey=mate?P(mate):seerClaim||pick(others.filter(x=>!isWolf(x)));
-      if(prey){lNightAct(b,{type:'wolf',target:prey.id});return true}
+      const mate=Object.values(N.wolf)[0];const prey=others.filter(x=>!isWolf(x));
+      const seer=L.claims.filter(c=>c.kind==='voyante').map(c=>P(c.by)).find(p=>p&&!p.out&&!isWolf(p));
+      const hunter=L.claims.filter(c=>isWolf(P(c.t))).map(c=>P(c.by)).find(p=>p&&!p.out&&!isWolf(p));
+      const t=mate?P(mate):seer||hunter||pick(prey);if(t){lNightAct(b,{type:'wolf',target:t.id});return true}
     }
-    if(b.role==='voyante'&&!N.seer){const unk=others.filter(x=>!L.seen[b.id][x.id]);if(unk.length){lNightAct(b,{type:'seer',target:pick(unk).id});return true}else{N.seer='none';if(lNightReady())lDawn();return true}}
+    if(b.role==='voyante'&&!N.seer){const unk=others.filter(x=>!L.seen[b.id][x.id]);if(unk.length){const s=topSuspect(b,unk.map(x=>x.id));lNightAct(b,{type:'seer',target:s||pick(unk).id})}else{N.seer='none';if(lNightReady())lDawn()}return true}
+    if(b.role==='salvateur'&&!N.guard){const opts=alive().filter(x=>x.id!==L.lastGuard);const seer=L.claims.filter(c=>c.kind==='voyante').map(c=>P(c.by)).find(p=>p&&!p.out&&p.id!==L.lastGuard);const t=seer&&chance(.7)?seer:pick(opts);lNightAct(b,{type:'guard',target:t.id});return true}
+    if(b.role==='cupidon'&&cupidPending()&&!N.cupid){const al=shuffle(alive().map(x=>x.id));lNightAct(b,{type:'cupid',a:al[0],b:al[1]});return true}
     if(b.role==='sorciere'&&!N.witchDone&&alive().filter(isWolf).every(w=>N.wolf[w.id])){
       const v=lWolfTarget();const sus=topSuspect(b);
-      lNightAct(b,{type:'witch',save:v&&L.potions.vie&&(v===b.id||chance(.55)),poison:L.potions.mort&&sus&&chance(.2)?sus:null});return true}
+      lNightAct(b,{type:'witch',save:v&&L.potions.vie&&(v===b.id||chance(.55)),poison:L.potions.mort&&L.round>1&&sus&&chance(.25)?sus:null});return true}
   }
-  if(ph.k==='day'){
-    if(b.talked!==L.round&&el>2500+rnd(9000)){
+  if(ph.k==='day'||ph.k==='mayor'){
+    const rep=L.replies.find(r=>r.bot===b.id&&Date.now()>=r.at);
+    if(rep){L.replies=L.replies.filter(r=>r!==rep);const acc=P(rep.to);b.grudge=acc.id;
+      if(b.role==='voyante'){const f=Object.entries(L.seen[b.id]).find(([id,r])=>r==='loup'&&!P(id).out);if(f&&chance(.8)){lClaim(b,{kind:'voyante',target:f[0],role:'loup'});return true}}
+      say(b.id,'all',pick(DEFEND).replace(/\{x\}/g,acc.name));return true}
+    if(ph.k==='day'&&!b.reacted&&L.lastDeaths.length&&el>1500+rnd(6000)&&chance(.5)){b.reacted=1;const v=P(L.lastDeaths[0]);say(b.id,'all',pick(MORNING).replace('{v}',v.name).replace('{x}',pick(others).name));return true}
+    if(ph.k==='day'&&b.talked!==L.round&&el>5000+rnd(12000)){
       b.talked=L.round;
-      if(b.role==='voyante'){const found=Object.entries(L.seen[b.id]).find(([id,r])=>r==='loup'&&!P(id).out);if(found&&chance(.8)){lClaim(b,{kind:'voyante',target:found[0],role:'loup'});return true}}
+      if(b.role==='voyante'){const f=Object.entries(L.seen[b.id]).find(([id,r])=>r==='loup'&&!P(id).out);if(f&&chance(.75)){lClaim(b,{kind:'voyante',target:f[0],role:'loup'});return true}}
       if(isWolf(b)){
-        const accuser=L.claims.find(c=>c.kind==='voyante'&&P(c.t)&&isWolf(P(c.t))&&c.round===L.round);
-        if(accuser&&chance(.5)){const t=P(accuser.by);if(t&&!t.out){lClaim(b,{kind:'voyante',target:t.id,role:'loup'});return true}}
-        if(chance(.5)){lClaim(b,{kind:'accuse',target:pick(others.filter(x=>!isWolf(x))).id});return true}
-        say(b.id,'all',fill(pick(BOT_DAY.loup)));return true;
+        const accuser=L.claims.find(c=>c.kind==='voyante'&&isWolf(P(c.t))&&c.round===L.round&&!P(c.by).out&&!isWolf(P(c.by)));
+        if(accuser&&chance(.55)){lClaim(b,{kind:'voyante',target:accuser.by,role:'loup'});return true}
+        if(chance(.5)){lClaim(b,{kind:'accuse',target:topSuspect(b,null,true)||pick(others.filter(x=>!isWolf(x))).id});return true}
+        say(b.id,'all',fill(pick(CHATTER.loup)));return true;
       }
-      if(chance(.4)){const s=topSuspect(b);if(s){lClaim(b,{kind:'accuse',target:s});return true}}
-      say(b.id,'all',fill(pick(BOT_DAY.innocent)));return true;
+      const last=[...L.hist].reverse().find(h=>h.kind==='vote'&&h.out&&L.dead[h.out]!=='loup');
+      if(last&&chance(.4)){const voters=Object.entries(last.votes).filter(([v,t])=>t===last.out&&v!==b.id&&!P(v).out).map(([v])=>v);if(voters.length){const x=P(pick(voters));say(b.id,'all',`Hier ${x.name} a voté contre ${P(last.out).name}, qui était innocent… bizarre 🤔`);L.claims.push({by:b.id,t:x.id,kind:'accuse',round:L.round,silent:true});return true}}
+      if(chance(.45)){const s=topSuspect(b);if(s){lClaim(b,{kind:'accuse',target:s});return true}}
+      say(b.id,'all',fill(pick(CHATTER.innocent)));return true;
     }
-    if(L.votes[b.id]==null){
-      const human=G.players.find(p=>!p.bot&&!p.out&&p.online);
-      const ready=G.solo?(human?L.votes[human.id]!=null||el>90000:el>20000):el>25000+rnd(20000);
-      if(ready&&el>8000){
+    if(ph.k==='mayor'&&!L.mvotes[b.id]&&el>3000+rnd(5000)){
+      const mate=isWolf(b)?alive().find(x=>isWolf(x)&&x.id!==b.id):null;
+      lMayorVote(b,(mate&&chance(.6)?mate:chance(.3)?b:pick(alive())).id);return true;
+    }
+    if(ph.k==='day'&&L.votes[b.id]==null){
+      const humans=alive().filter(p=>!p.bot&&p.online);
+      const ready=G.solo?(humans.length?humans.every(h=>L.votes[h.id]!=null)||el>120000:el>25000):el>30000+rnd(30000)||(humans.length&&humans.every(h=>L.votes[h.id]!=null)&&el>15000);
+      if(ready&&el>10000){
         let t;
-        if(isWolf(b)){const accused=L.claims.filter(c=>!isWolf(P(c.t))&&!P(c.t).out).map(c=>c.t);t=accused.length&&chance(.7)?pick(accused):pick(others.filter(x=>!isWolf(x))).id}
+        if(isWolf(b))t=topSuspect(b,null,true);
         else if(b.role==='voyante'){const f=Object.entries(L.seen[b.id]).find(([id,r])=>r==='loup'&&!P(id).out);t=f?f[0]:topSuspect(b)}
         else t=topSuspect(b);
         lVote(b,t||pick(others).id);return true;
@@ -550,21 +601,28 @@ function botLoup(b){
   if(ph.k==='hunter'&&ph.actor===b.id&&el>1500){const s=topSuspect(b)||pick(alive()).id;lHunt(b,s);return true}
   return false;
 }
-function topSuspect(b){
-  const sc={};alive().forEach(p=>{if(p.id!==b.id)sc[p.id]=Math.random()*.5});
-  L.claims.forEach(c=>{if(sc[c.t]==null)return;
-    if(c.kind==='voyante'){const nClaims=L.claims.filter(x=>x.kind==='voyante'&&x.round===c.round).length;const w=nClaims>1?1:2.5;sc[c.t]+=c.r==='loup'?w:-w}
-    else sc[c.t]+=c.by===b.id?0:.8;});
-  Object.entries(L.votes).forEach(([v,t])=>{if(sc[t]!=null&&P(v)&&!P(v).bot)sc[t]+=.6});
+function topSuspect(b,pool,asWolf){
+  const sc={};alive().forEach(p=>{if(p.id!==b.id&&(!pool||pool.includes(p.id)))sc[p.id]=Math.random()*.4});
+  const seerClaimers=[...new Set(L.claims.filter(c=>c.kind==='voyante').map(c=>c.by))].filter(id=>!P(id).out);
+  L.claims.forEach(c=>{if(sc[c.t]==null||c.by===b.id)return;
+    if(c.kind==='voyante'){const w=seerClaimers.length>1?1:2.5;sc[c.t]+=c.r==='loup'?w:-w}
+    else sc[c.t]+=c.round===L.round?.8:.3});
+  if(seerClaimers.length>1)seerClaimers.forEach(id=>{if(sc[id]!=null)sc[id]+=.8});
+  L.hist.filter(h=>h.kind==='vote'&&h.out).forEach(h=>{const wasWolf=L.dead[h.out]==='loup';Object.entries(h.votes).forEach(([v,t])=>{if(sc[v]!=null&&t===h.out)sc[v]+=wasWolf?-.6:.5})});
+  Object.entries(L.votes).forEach(([v,t])=>{if(sc[t]!=null)sc[t]+=P(v).bot?.3:.5});
+  if(b.grudge&&sc[b.grudge]!=null)sc[b.grudge]+=.7;
+  if(L.lovers&&L.lovers.includes(b.id)){const o=L.lovers.find(x=>x!==b.id);if(sc[o]!=null)sc[o]-=20}
   if(b.role==='voyante')Object.entries(L.seen[b.id]).forEach(([id,r])=>{if(sc[id]!=null)sc[id]+=r==='loup'?10:-10});
+  if(asWolf)Object.keys(sc).forEach(id=>{if(isWolf(P(id)))sc[id]=-99});
   const best=Object.keys(sc).sort((x,y)=>sc[y]-sc[x])[0];return best||null;
 }
 function loupAuto(){
   const ph=G.phase;
-  if(ph.k==='night'){const N=L.night;alive().filter(isWolf).forEach(w=>{if(!N.wolf[w.id]){const t=pick(alive().filter(x=>!isWolf(x)));if(t)N.wolf[w.id]=t.id}});if(!N.seer)N.seer='none';N.witchDone=true;lDawn()}
+  if(ph.k==='night'){const N=L.night;alive().filter(isWolf).forEach(w=>{if(!N.wolf[w.id]){const t=pick(alive().filter(x=>!isWolf(x)));if(t)N.wolf[w.id]=t.id}});if(!N.seer)N.seer='none';if(!N.guard)N.guard='none';if(cupidPending()&&!N.cupid){const al=shuffle(alive().map(x=>x.id));L.lovers=[al[0],al[1]];N.cupid=true}N.witchDone=true;lDawn()}
+  else if(ph.k==='mayor')lMayorDone();
   else if(ph.k==='day')lVerdict();
   else if(ph.k==='verdict')lAfterVerdict();
-  else if(ph.k==='hunter'){const t=pick(alive().filter(x=>x.id!==ph.actor));if(t)lHunt(P(ph.actor),t.id);else{if(!lWin())lDay()}}
+  else if(ph.k==='hunter'){const t=pick(alive().filter(x=>x.id!==ph.actor));if(t)lHunt(P(ph.actor),t.id);else afterDeaths(ph.then)}
 }
 
 /* =====================================================================
@@ -576,7 +634,7 @@ function handleAct(pid,a){
     if(Date.now()-(p.lastMsg||0)<1000)return sync();p.lastMsg=Date.now();
     let to='all';if(a.to==='wolves'&&G.game==='loup'&&G.status==='play'&&p.role==='loup')to='wolves';else if(P(a.to)&&a.to!==pid)to=a.to;
     if(G.game==='loup'&&G.status==='play'&&p.out)return err('Les morts ne parlent pas… (sauf à voix basse 👻)'),sync();
-    say(pid,to,txt);return sync()}
+    say(pid,to,txt);if(G.game==='loup'&&to==='all')lHearChat(p,txt);return sync()}
   if(G.status==='lobby'){
     if(pid!==hostPid)return;
     if(a.type==='settings'){if(['facile','normal'].includes(a.mode))G.mode=a.mode;if(['bluff','loup'].includes(a.game))G.game=a.game}
@@ -593,7 +651,8 @@ function handleAct(pid,a){
     else if(a.type==='lose'&&ph.k==='lose'&&ph.actor===pid)bKill(p,+a.idx||0,ph.after,ph.why);
     else if(a.type==='exchange'&&ph.k==='exchange'&&ph.actor===pid)bExchange(p,a.keep||[]);
   }else{
-    if(['wolf','seer','witch'].includes(a.type))lNightAct(p,a);
+    if(['wolf','seer','witch','guard','cupid'].includes(a.type))lNightAct(p,a);
+    else if(a.type==='mayor')lMayorVote(p,a.target);
     else if(a.type==='vote')lVote(p,a.target);
     else if(a.type==='claim')lClaim(p,a);
     else if(a.type==='hunt')lHunt(p,a.target);
@@ -621,13 +680,17 @@ function viewFor(pid){
       seats:G.players.map(p=>({id:p.id,coins:p.coins,cards:p.cards.map(c=>({dead:c.dead,c:c.dead||p.id===pid||G.status==='end'?c.c:null}))}))};
   }
   if(G.game==='loup'&&G.L){
-    const Lx=G.L;const wolfMe=me&&me.role==='loup';
-    v.L={round:Lx.round,dead:Lx.dead,claims:Lx.claims,votes:ph&&ph.k==='day'?Lx.votes:{},lastVote:Lx.lastVote||null,lastDeaths:Lx.lastDeaths||[],
-      me:me?{role:me.role,wolves:wolfMe?G.players.filter(isWolf).map(p=>p.id):null,seen:me.role==='voyante'?Lx.seen[me.id]:null,potions:me.role==='sorciere'?Lx.potions:null}:null,
+    const Lx=G.L;const r=me&&me.role;const wolfMe=r==='loup';
+    const seeLovers=Lx.lovers&&(G.status==='end'||(me&&(Lx.lovers.includes(me.id)||r==='cupidon')));
+    v.L={round:Lx.round,dead:Lx.dead,claims:Lx.claims.filter(c=>c.round===Lx.round&&!c.silent),votes:ph&&ph.k==='day'?Lx.votes:{},mvotes:ph&&ph.k==='mayor'?Lx.mvotes:{},
+      mayor:Lx.mayor,lovers:seeLovers?Lx.lovers:null,hist:Lx.hist,lastVote:Lx.lastVote||null,lastDeaths:Lx.lastDeaths||[],
+      inPlay:[...new Set(G.players.map(p=>p.role))],
+      me:me?{role:r,wolves:wolfMe?G.players.filter(isWolf).map(p=>p.id):null,seen:r==='voyante'?Lx.seen[me.id]:null,potions:r==='sorciere'?Lx.potions:null,lastGuard:r==='salvateur'?Lx.lastGuard:null}:null,
       roles:G.status==='end'?Object.fromEntries(G.players.map(p=>[p.id,p.role])):null,night:null};
     if(ph&&ph.k==='night'&&me&&!me.out){const N=Lx.night;
-      v.L.night={wolf:wolfMe?N.wolf:null,mine:me.role==='loup'?N.wolf[me.id]||null:me.role==='voyante'?N.seer:me.role==='sorciere'?(N.witchDone?'done':null):null,
-        victim:me.role==='sorciere'&&alive().filter(isWolf).every(w=>N.wolf[w.id])?lWolfTarget():undefined}}
+      v.L.night={wolf:wolfMe?N.wolf:null,cupid:r==='cupidon'&&Lx.round===1&&!Lx.lovers,
+        mine:r==='loup'?N.wolf[me.id]||null:r==='voyante'?N.seer:r==='sorciere'?(N.witchDone?'done':null):r==='salvateur'?N.guard:null,
+        victim:r==='sorciere'&&alive().filter(isWolf).every(w=>N.wolf[w.id])?lWolfTarget():undefined}}
   }
   return v;
 }
@@ -721,20 +784,24 @@ const GAMEINFO={
   bluff:{e:'🎭',n:'Le Bluff',d:'2 personnages secrets. Prétends ce que tu veux… on peut te traiter de menteur. 2 à 8 joueurs, 10-15 min.'},
   loup:{e:'🐺',n:'Loup-garou',d:'Rôles secrets, nuits de chasse, journées de débats et de votes. 5 à 8 joueurs (robots compris), 15-20 min.'}};
 function gamePicker(sel,attr){return `<div class="games">${Object.entries(GAMEINFO).map(([k,g])=>`<button type="button" class="gpick" ${attr}="${k}" aria-pressed="${sel===k}"><span class="ge">${g.e}</span><span><b>${g.n}</b><span>${g.d}</span></span></button>`).join('')}</div>`}
-function rulesHtml(){return `<details class="rules"><summary>Règles en 1 minute</summary>
-  <p><b>🎭 Le Bluff.</b> Chacun a 2 cartes personnage cachées et 2 pièces. À ton tour, fais UNE action. Certaines demandent un personnage : tu peux l'annoncer même sans l'avoir. N'importe qui peut crier « Menteur ! » : si tu mentais, tu perds une carte. Si tu disais vrai, c'est l'accusateur qui en perd une. Sans carte, tu es éliminé. Le dernier en jeu gagne.</p>
-  <ul>${Object.values(CHARS).map(c=>`<li>${c.e} <b>${c.n}</b> : ${c.a}${c.b?` · ${c.b}`:''}</li>`).join('')}<li>Sans personnage : 🪙 Revenu (+1), 👵 Aide de Mamie (+2, un Banquier peut bloquer), 💥 Coup fatal (7 pièces, imparable, obligatoire à 10 pièces).</li></ul>
-  <p><b>🐺 Loup-garou.</b> La nuit, les loups choisissent une victime, la Voyante découvre un rôle, la Sorcière peut sauver ou empoisonner. Le jour, tout le monde débat (à voix haute et dans la discussion) et vote pour éliminer un suspect. Les villageois gagnent s'ils éliminent tous les loups ; les loups gagnent s'ils sont aussi nombreux que les autres. Tout le monde peut prétendre être la Voyante… même un loup.</p></details>`}
+function rulesHtml(){return `<details class="rules"><summary>Règles du Loup-garou</summary>
+  <p hidden><b>🎭 Le Bluff.</b> Chacun a 2 cartes personnage cachées et 2 pièces. À ton tour, fais UNE action. Certaines demandent un personnage : tu peux l'annoncer même sans l'avoir. N'importe qui peut crier « Menteur ! » : si tu mentais, tu perds une carte. Si tu disais vrai, c'est l'accusateur qui en perd une. Sans carte, tu es éliminé. Le dernier en jeu gagne.</p>
+  <ul hidden>${Object.values(CHARS).map(c=>`<li>${c.e} <b>${c.n}</b> : ${c.a}${c.b?` · ${c.b}`:''}</li>`).join('')}<li>Sans personnage : 🪙 Revenu (+1), 👵 Aide de Mamie (+2, un Banquier peut bloquer), 💥 Coup fatal (7 pièces, imparable, obligatoire à 10 pièces).</li></ul>
+  <p><b>🌙 La nuit</b>, tout se passe en secret sur les téléphones : les loups choisissent une victime, la Voyante découvre le rôle d'un joueur, et selon les rôles en jeu la Sorcière sauve ou empoisonne, le Salvateur protège, Cupidon lie deux amoureux.</p>
+  <p><b>☀️ Le jour</b>, on découvre les morts et leur rôle. Le premier jour, on élit un Maire (vote double). Puis on débat, à voix haute et dans la discussion : accuser, se défendre, se dire Voyante… même si c'est faux ! Enfin on vote pour éliminer un suspect.</p>
+  <p><b>🏆 Victoire</b> : le village gagne quand tous les loups sont morts. Les loups gagnent quand ils sont aussi nombreux que les autres.</p>
+  <ul>${Object.values(ROLES).map(r=>`<li>${r.e} <b>${r.n}</b> : ${r.d}</li>`).join('')}</ul>
+  <p><b>Facile</b> : loups, Voyante, villageois (+ Chasseur à 7). <b>Normal</b> : + Sorcière, Chasseur, Cupidon, Salvateur selon le nombre de joueurs.</p></details>`}
 function renderHome(){
   const qs=new URLSearchParams(location.search);const code=(qs.get('salon')||'').toUpperCase();
   const prof=store.get('coupsbas-profil',{name:'',av:pick(AVATARS)});
   const saved=store.get('coupsbas-y-host',null);
-  ui.home=ui.home||{av:prof.av,mode:'facile',game:'bluff',bots:3};
+  ui.home=ui.home||{av:prof.av,mode:'facile',game:'loup',bots:5};
   const H=ui.home;
   const av=AVATARS.map(a=>`<button type="button" aria-pressed="${a===H.av}" data-pickav="${a}">${a}</button>`).join('');
   app.innerHTML=`
-  <header class="hero"><h1 class="logo">Coups Bas !<small>BLUFF · LOUP-GAROU</small></h1>
-    <p class="tag">Mens, accuse, devine qui ment. Entre amis, chacun sur son téléphone, ou seul contre des robots.</p></header>
+  <header class="hero"><h1 class="logo">Loup-garou<small>DU MANOIR · COUPS BAS</small></h1>
+    <p class="tag">Rôles secrets, nuits de chasse, journées de débats et de mensonges. Entre amis chacun sur son téléphone, ou seul contre des robots. 5 à 8 joueurs, 15-20 min.</p></header>
   <div class="home">
     <section class="card" id="joinCard" ${code?'':'hidden'}>
       <h2>Rejoindre le salon</h2>
@@ -750,7 +817,6 @@ function renderHome(){
       <div class="stack">
         <label class="field"><span class="label">Ton prénom</span><input id="hName" maxlength="14" value="${esc(prof.name)}" placeholder="Alex" autocomplete="nickname"></label>
         <div class="field"><span class="label">Ton pion</span><div class="avatars">${av}</div></div>
-        <div class="field"><span class="label">Jeu</span>${gamePicker(H.game,'data-hgame')}</div>
         <div class="field"><span class="label">Mode</span><div class="seg"><button type="button" data-mode="facile" aria-pressed="${H.mode==='facile'}">Facile<small>dès 10 ans</small></button><button type="button" data-mode="normal" aria-pressed="${H.mode==='normal'}">Normal<small>plus de rôles, robots plus rusés</small></button></div></div>
         <button class="btn big" id="doCreate">👥 Créer un salon entre amis</button>
         <div class="field"><span class="label">Ou jouer seul contre</span><div class="seg">${(H.game==='loup'?[4,5,6,7]:[2,3,4,5]).map(n=>`<button type="button" data-bots="${n}" aria-pressed="${H.bots===n}">${n} robots</button>`).join('')}</div></div>
@@ -761,7 +827,7 @@ function renderHome(){
     <div class="row" style="justify-content:center"><button class="btn sm alt" id="swap">${code?'Créer ma propre partie':'J’ai un code, je rejoins'}</button></div>
   </div>
   ${statusEl()}${rulesHtml()}
-  <p class="foot"><a href="express.html">Anciennes versions : Express</a> · <a href="classique.html">Classique</a></p>`;
+  `;
   app.onclick=e=>{
     const b=e.target.closest('button');if(!b)return;const d=b.dataset;
     const keepNames=()=>{const h=$('#hName');if(h)prof.name=h.value;};
@@ -801,7 +867,6 @@ function renderLobby(v){
     <h2>Joueurs (${v.players.length}/8)</h2>
     <div class="plist">${v.players.map(p=>`<div class="pl"><span class="dot ${p.online?'':'off'}"></span><span class="av">${p.av}</span><span class="nm">${esc(p.name)}${p.id===myPid?' (toi)':''}${p.id===v.host?' · hôte':''}${p.bot?' · robot':''}</span>${host&&p.id!==v.host?`<button class="btn sm alt" data-kick="${p.id}">Retirer</button>`:''}</div>`).join('')}</div>
     ${host?`<div class="row" style="margin-top:10px"><button class="btn sm alt" data-a="bot" ${v.players.length>=8?'disabled':''}>+ Ajouter un robot 🤖</button></div>
-      <div class="field" style="margin-top:12px"><span class="label">Jeu</span>${gamePicker(v.game,'data-set-game')}</div>
       <div class="field" style="margin-top:10px"><span class="label">Mode</span><div class="seg"><button data-set-mode="facile" aria-pressed="${v.mode==='facile'}">Facile<small>dès 10 ans</small></button><button data-set-mode="normal" aria-pressed="${v.mode==='normal'}">Normal<small>adultes</small></button></div></div>
       <button class="btn big" style="width:100%;margin-top:14px" data-a="start" ${v.players.length<min?'disabled':''}>Lancer ${GAMEINFO[v.game].n}</button>
       <p class="small" style="color:var(--ink-2)">${v.players.length<min?`Il faut au moins ${min} joueurs : ajoute des robots si besoin.`:'Tout le monde est là ? Que le meilleur menteur gagne.'} Garde cette page ouverte : ton téléphone sert de serveur.</p>`
@@ -871,61 +936,102 @@ function bluffPanel(v){
     <details class="cheat"><summary>Aide-mémoire des personnages (${v.B.copies} exemplaires de chaque)</summary><table>${Object.entries(CHARS).map(([k,c])=>{const shown=v.B.seats.reduce((s,x)=>s+x.cards.filter(y=>y.dead&&y.c===k).length,0);return `<tr><td>${c.e} <b>${c.n}</b></td><td>${c.a}${c.b?'<br>'+c.b:''}</td><td style="white-space:nowrap">${shown} révélé${shown>1?'s':''}</td></tr>`}).join('')}</table></details>`;
 }
 /* --- Vue du Loup-garou --- */
+const notesKey=v=>'lg-notes-'+v.gid;
 function loupSeats(v){
-  const Lv=v.L;const ph=v.phase||{};const wolves=Lv.me&&Lv.me.wolves||[];
+  const Lv=v.L;const ph=v.phase||{};const wolves=Lv.me&&Lv.me.wolves||[];const notes=store.get(notesKey(v),{});
+  const tally=ph.k==='day'?Lv.votes:ph.k==='mayor'?Lv.mvotes:{};
   return `<div class="seats">${v.players.map(p=>{
     const dead=Lv.dead[p.id];const seen=Lv.me&&Lv.me.seen&&Lv.me.seen[p.id];const role=dead||(Lv.roles&&Lv.roles[p.id]);
-    const votes=ph.k==='day'?Object.values(Lv.votes).filter(t=>t===p.id).length:0;
-    return `<div class="seat ${p.out?'out':''} ${p.id===myPid?'me':''}"><div class="nm"><span class="av">${p.av}</span><span>${esc(p.name)}${p.id===myPid?' (toi)':''}</span></div>
-      <div class="info">${role?`${ROLES[role].e} ${ROLES[role].n}`:wolves.includes(p.id)&&p.id!==myPid?'🐺 loup (allié)':seen?`🔮 ${ROLES[seen].e} ${ROLES[seen].n}`:p.out?'💀':'❔'}${votes?` · <b>${votes} vote${votes>1?'s':''}</b>`:''}${ph.k==='day'&&Lv.votes[p.id]?' ✓':''}</div></div>`}).join('')}</div>`;
+    const n=Object.entries(tally).filter(([vv,t])=>t===p.id).reduce((s,[vv])=>s+(ph.k==='day'&&vv===Lv.mayor?2:1),0);
+    const lover=Lv.lovers&&Lv.lovers.includes(p.id);const mark=notes[p.id]||'';
+    const known=role?`${ROLES[role].e} ${ROLES[role].n}`:p.id===myPid?`${ROLES[Lv.me.role].e} toi`:wolves.includes(p.id)?'🐺 loup allié':seen?`🔮 ${ROLES[seen].e} ${ROLES[seen].n}`:'';
+    return `<button class="seat ${p.out?'out':''} ${p.id===myPid?'me':''}" data-note="${p.id}" ${p.id===myPid||p.out?'disabled':''} style="text-align:left;color:inherit;font:inherit">
+      <div class="nm"><span class="av">${p.av}</span><span>${esc(p.name)}${Lv.mayor===p.id?' 🎖️':''}${lover?' 💘':''}</span></div>
+      <div class="info">${p.out?'💀 ':''}${known||(mark==='w'?'📝 🐺 louche':mark==='i'?'📝 😇 confiance':'❔')}${n?` · <b>${n} vote${n>1?'s':''}</b>`:''}${tally[p.id]?' ✓':''}</div></button>`}).join('')}</div>
+    ${v.status==='play'?'<p class="small muted" style="margin:-4px 0 10px">Touche un joueur pour noter 🐺 louche / 😇 confiance (visible que par toi).</p>':''}`;
+}
+function guide(v){
+  const ph=v.phase;const R=v.L.me.role;const N=v.L.night||{};const out=pp(v,myPid).out;
+  if(out)return ['Tu es éliminé.','Regarde la suite en silence : les morts ne parlent pas.'];
+  if(ph.k==='night'){
+    if(R==='loup')return ['🌙 C’est la nuit. Les loups se réveillent.',N.mine?'C’est noté. Attends que les autres rôles finissent.':'Choisis qui dévorer. Vise ceux qui semblent malins ou qui disent être la Voyante.'];
+    if(R==='voyante')return ['🌙 C’est la nuit. Tu as une vision.',N.mine?'Retiens bien ce que tu as vu… et décide demain si tu le révèles.':'Choisis un joueur pour découvrir son vrai rôle.'];
+    if(R==='sorciere')return ['🌙 C’est la nuit. Tu prépares tes potions.',N.mine==='done'?'C’est fait. Attends le matin.':'Quand les loups ont choisi, sauve leur victime ou empoisonne quelqu’un. Ou garde tes potions.'];
+    if(R==='salvateur')return ['🌙 C’est la nuit. Tu veilles.',N.mine?'Tu protèges quelqu’un cette nuit.':'Choisis qui protéger des loups.'];
+    if(R==='cupidon'&&N.cupid)return ['🌙 Première nuit : à toi, Cupidon.','Choisis deux amoureux (tu peux te choisir).'];
+    return ['🌙 C’est la nuit. Tu dors.','Rien à faire : les loups et les rôles spéciaux agissent en secret.'];
+  }
+  if(ph.k==='mayor')return ['🎖️ Élection du Maire.','Vote pour qui tu veux comme Maire : son vote comptera double et départagera les égalités. Méfie-toi, un loup peut être élu !'];
+  if(ph.k==='day')return ['☀️ Le village débat.','1. Lis qui est mort cette nuit. 2. Accuse, défends-toi, bluffe (dans la discussion et à voix haute). 3. Vote pour éliminer le plus suspect.'];
+  if(ph.k==='verdict')return ['⚖️ Le village a voté.','Regarde qui a voté contre qui : c’est le meilleur indice pour démasquer les loups.'];
+  if(ph.k==='hunter')return ['🏹 Le chasseur est mort.','Il tire sur quelqu’un avant de partir.'];
+  return ['',''];
 }
 function loupPanel(v){
   const Lv=v.L;const ph=v.phase;const meP=pp(v,myPid);const R=Lv.me.role;const others=v.players.filter(p=>!p.out&&p.id!==myPid);
-  let h='',mine=false;
-  const roleBox=`<div class="role ${R==='loup'?'wolf':''}"><span class="re">${ROLES[R].e}</span><span><b>Tu es ${ROLES[R].n}</b><span>${ROLES[R].d}</span></span></div>`;
-  if(meP.out&&v.status==='play'&&ph.k!=='verdict'){h=`<h2>👻 Tu es mort</h2><p>${ph.k==='night'?'🌙 La nuit passe…':ph.k==='day'?`☀️ Le village vote (${Object.keys(Lv.votes).length}/${v.players.filter(p=>!p.out).length})…`:'Le chasseur vise…'} Tu regardes la suite en silence.</p>`}
+  let h='',mine=false;const [what,todo]=guide(v);
+  const roleBox=`<div class="role ${R==='loup'?'wolf':''}"><span class="re">${ROLES[R].e}</span><span><b>Tu es ${ROLES[R].n}</b><span>${ROLES[R].goal}</span></span></div>`;
+  const chips=(list,act,sel)=>`<div class="picks">${list.map(p=>`<button class="chip" data-act="${act}" data-t="${p.id}" aria-pressed="${sel===p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`;
+  if(meP.out&&v.status==='play'&&ph.k!=='verdict'&&!(ph.k==='hunter'&&ph.actor===myPid)){h=`<h2>👻 Tu es mort</h2><p>${ph.k==='night'?'🌙 La nuit passe…':ph.k==='day'?`☀️ Le village vote (${Object.keys(Lv.votes).length}/${v.players.filter(p=>!p.out).length})…`:'…'} Tu regardes la suite.</p>`}
   else if(ph.k==='night'){
     const N=Lv.night||{};
     if(R==='loup'){mine=!N.mine;const wv=N.wolf||{};
-      h=`<h2>🌙 Nuit ${Lv.round} : qui dévorer ?</h2><p class="small">Mets-toi d'accord avec ${Lv.me.wolves.length>1?'l’autre loup (canal 🐺 de la discussion)':'toi-même'}. Astuce : élimine celui qui a l'air d'être la Voyante.</p>
-        <div class="picks">${others.filter(p=>!Lv.me.wolves.includes(p.id)).map(p=>`<button class="chip" data-act="wolf" data-t="${p.id}" aria-pressed="${N.mine===p.id}">${p.av} ${esc(p.name)}${Object.values(wv).filter(x=>x===p.id).length?` <span class="n">🐺×${Object.values(wv).filter(x=>x===p.id).length}</span>`:''}</button>`).join('')}</div>`}
-    else if(R==='voyante'){mine=!N.mine;h=N.mine?`<h2>🔮 Vision reçue</h2><p>${pn(v,N.mine)} est <b>${ROLES[Lv.me.seen[N.mine]].e} ${ROLES[Lv.me.seen[N.mine]].n}</b>. Le village dort encore…</p>`
-      :`<h2>🔮 Nuit ${Lv.round} : qui veux-tu sonder ?</h2><div class="picks">${others.filter(p=>!Lv.me.seen[p.id]).map(p=>`<button class="chip" data-act="seer" data-t="${p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`}
+      h=`<h2>🐺 Qui dévorer cette nuit ?</h2>${Lv.me.wolves.length>1?'<p class="small">Mets-toi d’accord avec ton complice (canal 🐺 Loups dans la discussion).</p>':''}
+        <div class="picks">${others.filter(p=>!Lv.me.wolves.includes(p.id)).map(p=>{const k=Object.values(wv).filter(x=>x===p.id).length;return `<button class="chip" data-act="wolf" data-t="${p.id}" aria-pressed="${N.mine===p.id}">${p.av} ${esc(p.name)}${k?` <span class="n">🐺×${k}</span>`:''}</button>`}).join('')}</div>`}
+    else if(R==='voyante'){mine=!N.mine;h=N.mine&&Lv.me.seen[N.mine]?`<h2>🔮 Vision</h2><div class="verdict"><div class="v">${pn(v,N.mine)}</div>est ${ROLES[Lv.me.seen[N.mine]].e} ${ROLES[Lv.me.seen[N.mine]].n}</div>`
+      :`<h2>🔮 Qui veux-tu sonder ?</h2>${chips(others.filter(p=>!Lv.me.seen[p.id]),'seer')}`}
+    else if(R==='salvateur'){mine=!N.mine;h=N.mine?`<h2>🛡️ Tu protèges ${pn(v,N.mine)}</h2>`:`<h2>🛡️ Qui protéger ?</h2>${chips(v.players.filter(p=>!p.out&&p.id!==Lv.me.lastGuard),'guard')}${Lv.me.lastGuard?`<p class="small">Pas ${pn(v,Lv.me.lastGuard)} : déjà protégé la nuit dernière.</p>`:''}`}
+    else if(R==='cupidon'&&N.cupid){mine=true;const s=ui.sel.lov||[];
+      h=`<h2>💘 Choisis deux amoureux</h2><div class="picks">${v.players.filter(p=>!p.out).map(p=>`<button class="chip" data-act="lov" data-t="${p.id}" aria-pressed="${s.includes(p.id)}">${p.av} ${esc(p.name)}</button>`).join('')}</div>
+        <div class="acts"><button class="btn big" data-act="cupid" ${s.length!==2?'disabled':''}>Décocher les flèches 💘</button></div>`}
     else if(R==='sorciere'){
       const pot=Lv.me.potions;
-      if(N.mine==='done')h=`<h2>🧪 Tes potions sont rangées</h2><p>Le village dort encore…</p>`;
+      if(N.mine==='done')h=`<h2>🧪 Potions rangées</h2><p>Attends le matin…</p>`;
       else if(N.victim===undefined)h=`<h2>🧪 Les loups rôdent…</h2><p>Attends qu'ils aient choisi leur victime.</p>`;
       else{mine=true;const sel=ui.sel;h=`<h2>🧪 Les loups attaquent ${N.victim?pn(v,N.victim):'personne'} !</h2>
-        ${pot.vie&&N.victim?`<button class="abtn" data-act="wsave" aria-pressed="${!!sel.save}"><span class="ae">💚</span><span><b>Potion de vie</b><small>Sauver ${pn(v,N.victim)} (une seule fois)</small></span></button>`:'<p class="small">Potion de vie déjà utilisée.</p>'}
-        ${pot.mort?`<p style="margin-top:8px"><b>☠️ Potion de mort</b> (facultatif) :</p><div class="picks">${others.map(p=>`<button class="chip" data-act="wpoison" data-t="${p.id}" aria-pressed="${sel.poison===p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`:'<p class="small">Potion de mort déjà utilisée.</p>'}
+        ${pot.vie&&N.victim?`<button class="abtn" data-act="wsave" aria-pressed="${!!sel.save}"><span class="ae">💚</span><span><b>Potion de vie</b><small>Sauver ${pn(v,N.victim)} (une seule fois dans la partie)</small></span></button>`:'<p class="small">Potion de vie : déjà utilisée.</p>'}
+        ${pot.mort?`<p style="margin-top:8px"><b>☠️ Potion de mort</b> (facultatif) :</p>${chips(others,'wpoison',sel.poison)}`:'<p class="small">Potion de mort : déjà utilisée.</p>'}
         <div class="acts"><button class="btn big" data-act="witch">Valider</button></div>`}
     }
-    else h=`<h2>🌙 Nuit ${Lv.round}</h2><p>Tu dors… Les loups, la Voyante${v.mode==='normal'?' et la Sorcière':''} agissent dans l'ombre.</p>`;
+    else h=`<h2>🌙 Nuit ${Lv.round}</h2><p>Zzz… Tu dors pendant que d'autres agissent dans l'ombre.</p>`;
   }
+  else if(ph.k==='mayor'){const my=Lv.mvotes[myPid];mine=!my;
+    h=`<h2>🎖️ Élection du Maire</h2>${chips(v.players.filter(p=>!p.out),'mayor',my)}<p class="done">${Object.keys(Lv.mvotes).length}/${v.players.filter(p=>!p.out).length} ont voté</p>`}
   else if(ph.k==='day'){
-    const myVote=Lv.votes[myPid];mine=myVote==null;
-    const deaths=Lv.lastDeaths||[];
-    h=`<h2>☀️ Jour ${Lv.round} : débat et vote</h2><p>${deaths.length?`Victime${deaths.length>1?'s':''} de la nuit : ${deaths.map(id=>pn(v,id)).join(', ')}.`:'Personne n’est mort cette nuit.'} Discutez à voix haute et dans la discussion, puis votez.</p>
-      <p style="margin-top:8px"><b>Ton vote :</b></p><div class="picks">${others.map(p=>`<button class="chip" data-act="vote" data-t="${p.id}" aria-pressed="${myVote===p.id}">${p.av} ${esc(p.name)}</button>`).join('')}<button class="chip" data-act="vote" data-t="none" aria-pressed="${myVote==='none'}">🤷 Personne</button></div>
-      <details style="margin-top:10px"><summary class="small" style="cursor:pointer;font-weight:600">📣 Déclarer quelque chose (vrai… ou bluff)</summary>
+    const myVote=Lv.votes[myPid];mine=myVote==null;const deaths=Lv.lastDeaths||[];
+    h=`<h2>☀️ Jour ${Lv.round}</h2><p>${deaths.length?`Mort${deaths.length>1?'s':''} cette nuit : ${deaths.map(id=>`${pn(v,id)} (${ROLES[Lv.dead[id]].e} ${ROLES[Lv.dead[id]].n})`).join(', ')}.`:'Personne n’est mort cette nuit.'}</p>
+      ${Lv.claims.length?`<div class="cheat" style="background:var(--cream-2);color:var(--ink)"><b>📣 Déclarations du jour</b><br>${Lv.claims.map(c=>c.kind==='voyante'?`${pn(v,c.by)} se dit Voyante : ${pn(v,c.t)} ${c.r==='loup'?'🐺 loup':'😇 innocent'}`:`${pn(v,c.by)} accuse ${pn(v,c.t)}`).join('<br>')}</div>`:''}
+      <p style="margin-top:10px"><b>Ton vote${Lv.mayor===myPid?' (compte double, tu es Maire)':''} :</b></p><div class="picks">${others.map(p=>`<button class="chip" data-act="vote" data-t="${p.id}" aria-pressed="${myVote===p.id}">${p.av} ${esc(p.name)}</button>`).join('')}<button class="chip" data-act="vote" data-t="none" aria-pressed="${myVote==='none'}">🤷 Personne</button></div>
+      <details style="margin-top:10px"><summary class="small" style="cursor:pointer;font-weight:600">📣 Faire une déclaration (vraie… ou bluff)</summary>
         <div class="picks">${others.map(p=>`<button class="chip" data-act="accuse" data-t="${p.id}">👉 J'accuse ${esc(p.name)}</button>`).join('')}</div>
         <div class="picks">${others.map(p=>`<button class="chip" data-act="seerclaim" data-t="${p.id}" data-r="loup">🔮 « ${esc(p.name)} est LOUP »</button>`).join('')}</div>
         <div class="picks">${others.map(p=>`<button class="chip" data-act="seerclaim" data-t="${p.id}" data-r="innocent">🔮 « ${esc(p.name)} est innocent »</button>`).join('')}</div>
       </details>
-      <p class="done">${Object.keys(Lv.votes).length}/${v.players.filter(p=>!p.out).length} ont voté${myVote?' · tu peux changer ton vote':''}</p>
+      <p class="done">${Object.keys(Lv.votes).length}/${v.players.filter(p=>!p.out).length} ont voté${myVote?' · tu peux encore changer':''}</p>
       ${myPid===v.host&&!v.solo?'<div class="acts"><button class="btn sm alt" data-act="endday">Clore le vote ➜</button></div>':''}`;
   }
   else if(ph.k==='verdict'){
     const lv=Lv.lastVote||{};const out=lv.out?pp(v,lv.out):null;
-    h=`<h2>⚖️ Verdict</h2>${out?`<div class="verdict"><div class="v">${out.av} ${esc(out.name)} est éliminé</div>C'était ${ROLES[Lv.dead[out.id]].e} ${ROLES[Lv.dead[out.id]].n} !</div>`:'<div class="verdict"><div class="v">Égalité</div>Personne n’est éliminé.</div>'}
-      <p class="small" style="margin-top:8px">${Object.entries(lv.votes||{}).map(([a,b])=>`${pn(v,a)} → ${b==='none'?'personne':pn(v,b)}`).join(' · ')}</p>
+    h=`<h2>⚖️ Verdict</h2>${out?`<div class="verdict"><div class="v">${out.av} ${esc(out.name)} est éliminé</div>C'était ${ROLES[Lv.dead[out.id]].e} ${ROLES[Lv.dead[out.id]].n} !</div>`:`<div class="verdict"><div class="v">${lv.tie?'Égalité':'Personne'}</div>Personne n’est éliminé.</div>`}
+      <div class="plist">${Object.entries(lv.votes||{}).map(([a,b])=>`<div class="pl" style="padding:4px 10px"><span>${pn(v,a)}${a===lv.mayor?' 🎖️×2':''}</span><span style="margin-left:auto">→ ${b==='none'?'personne':pn(v,b)}</span></div>`).join('')}</div>
       ${myPid===v.host?'<div class="acts"><button class="btn big" data-act="next">🌙 La nuit tombe ➜</button></div>':'<p class="done">L’hôte fait tomber la nuit.</p>'}`;
   }
   else if(ph.k==='hunter'){
-    if(ph.actor===myPid){mine=true;h=`<h2>🏹 Tu meurs… mais tu tires !</h2><p>Qui emportes-tu avec toi ?</p><div class="picks">${others.map(p=>`<button class="chip" data-act="hunt" data-t="${p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`}
+    if(ph.actor===myPid){mine=true;h=`<h2>🏹 Tu meurs… mais tu tires !</h2><p>Qui emportes-tu avec toi ?</p>${chips(others,'hunt')}`}
     else h=`<h2>🏹 Le chasseur ${pn(v,ph.actor)} vise…</h2>`;
   }
-  return roleBox+`<section class="panel ${mine?'mine':''}">${h}${timerHtml(v)}</section>`;
+  const hist=Lv.hist.length?`<details class="cheat"><summary>📜 Historique de l'enquête</summary>${[...Lv.hist].reverse().map(x=>x.kind==='nuit'?`<p style="margin:.4em 0"><b>Nuit ${x.round}</b> : ${x.deaths.length?x.deaths.map(d=>`${pn(v,d.id)} (${ROLES[d.role].e} ${ROLES[d.role].n})`).join(', '):'aucun mort'}</p>`
+    :`<p style="margin:.4em 0"><b>Vote jour ${x.round}</b> : ${x.out?`${pn(v,x.out)} éliminé (${ROLES[Lv.dead[x.out]].e} ${ROLES[Lv.dead[x.out]].n})`:'personne'}<br><span class="small">${Object.entries(x.votes).map(([a,b])=>`${pn(v,a)} → ${b==='none'?'personne':pn(v,b)}`).join(' · ')}</span></p>`).join('')}</details>`:'';
+  return roleBox+`<div class="cheat" style="margin:0 0 12px;background:rgba(231,189,82,.15)"><b style="color:var(--brass)">${esc(what)}</b><br>${esc(todo)}</div>`+`<section class="panel ${mine?'mine':''}">${h}${timerHtml(v)}</section>`+hist;
+}
+function introModal(v){
+  const R=v.L.me.role;const r=ROLES[R];
+  return `<div class="modal" id="intro"><section class="panel" style="max-width:480px;text-align:center">
+    <p class="label">Ton rôle secret</p><div style="font-size:4rem;line-height:1.1">${r.e}</div><h2 style="font-size:2rem">${r.n}</h2>
+    <p>${r.d}</p><p><b>${r.goal}</b></p>
+    ${R==='loup'&&v.L.me.wolves.length>1?`<p>Ton complice : ${v.L.me.wolves.filter(id=>id!==myPid).map(id=>pn(v,id)).join(', ')}</p>`:''}
+    <div class="cheat" style="text-align:left;background:var(--cream-2);color:var(--ink)"><b>Comment ça se passe</b><br>🌙 <b>La nuit</b> : les loups choisissent une victime, les rôles spéciaux agissent. Tout se fait en secret sur ton téléphone.<br>☀️ <b>Le jour</b> : on découvre les morts, on débat, on accuse (on peut mentir !), puis on vote pour éliminer un suspect.<br>🏆 <b>Fin</b> : quand tous les loups sont morts, ou quand les loups sont aussi nombreux que les villageois.<br>En jeu cette partie : ${v.L.inPlay.map(x=>ROLES[x].e+' '+ROLES[x].n).join(', ')}.</div>
+    <div class="acts"><button class="btn big" data-act="introok">J'ai compris, on y va !</button></div></section></div>`;
 }
 function chatHtml(v){
   const meP=pp(v,myPid);const wolf=v.L&&v.L.me&&v.L.me.role==='loup'&&v.status==='play';
@@ -941,11 +1047,11 @@ function chatHtml(v){
 }
 function renderGame(v){
   const meP=pp(v,myPid);
-  document.body.classList.toggle('day',v.game==='loup'&&v.phase&&['day','verdict'].includes(v.phase.k));
-  const top=`<div class="top"><span class="brand">${GAMEINFO[v.game].e} ${GAMEINFO[v.game].n}</span>${v.solo?'<span class="pill">🤖 Solo</span>':`<span class="pill">Salon <b>${esc(v.code)}</b></span>`}${v.game==='loup'?`<span class="pill">${v.phase&&['night'].includes(v.phase.k)?'🌙 Nuit':'☀️ Jour'} <b>${v.L.round}</b></span>`:''}</div>`;
+  document.body.classList.toggle('day',v.game==='loup'&&v.phase&&['day','verdict','mayor'].includes(v.phase.k));
+  const top=`<div class="top"><span class="brand">${GAMEINFO[v.game].e} ${GAMEINFO[v.game].n}</span>${v.solo?'<span class="pill">🤖 Solo</span>':`<span class="pill">Salon <b>${esc(v.code)}</b></span>`}${v.game==='loup'?`<span class="pill">${v.phase&&['night'].includes(v.phase.k)?'🌙 Nuit':'☀️ Jour'} <b>${v.L.round}</b></span><span class="pill">${v.players.filter(p=>!p.out).length} vivants</span>`:''}</div>`;
   let body='';
   if(v.game==='bluff')body=bluffSeats(v)+bluffPanel(v);else body=loupSeats(v)+loupPanel(v);
-  app.innerHTML=top+statusEl()+body+chatHtml(v)+`<div class="log">${v.log.slice(0,6).map(l=>`<div>${esc(l)}</div>`).join('')}</div>`;
+  app.innerHTML=top+statusEl()+body+chatHtml(v)+(v.game==='bluff'?`<div class="log">${v.log.slice(0,6).map(l=>`<div>${esc(l)}</div>`).join('')}</div>`:'')+(v.game==='loup'&&ui.intro!==v.gid?introModal(v):'');
 }
 function renderEnd(v){
   const E=v.end;const won=E.winners.includes(myPid);
@@ -955,7 +1061,7 @@ function renderEnd(v){
   app.innerHTML=`<div class="top"><span class="brand">Coups Bas !</span></div>
   <section class="card" style="text-align:center"><h2 style="font-size:1.9rem">${won?'🏆 Victoire !':'💀 Perdu…'}</h2><p class="big">${esc(E.txt)}</p>${extra}
     <p class="small" style="margin-top:10px">Victoires : ${v.players.filter(p=>p.wins).map(p=>`${p.av} ${esc(p.name)} ×${p.wins}`).join(' · ')||'—'}</p>
-    ${myPid===v.host?`<div class="acts"><button class="btn big" data-act="again" data-g="${v.game}">Rejouer ${GAMEINFO[v.game].e} ${GAMEINFO[v.game].n}</button><button class="btn alt" data-act="again" data-g="${v.game==='bluff'?'loup':'bluff'}">Passer à ${GAMEINFO[v.game==='bluff'?'loup':'bluff'].e} ${GAMEINFO[v.game==='bluff'?'loup':'bluff'].n}</button></div>`:'<p class="small">L’hôte peut relancer une partie.</p>'}
+    ${myPid===v.host?`<div class="acts"><button class="btn big" data-act="again" data-g="${v.game}">Rejouer (nouveaux rôles)</button></div>`:'<p class="small">L’hôte peut relancer une partie.</p>'}
   </section>${chatHtml(v)}`;
   document.body.classList.remove('day');
 }
@@ -983,7 +1089,7 @@ function receive(v){
     if(v.game==='bluff'&&k==='action'&&v.phase.actor===myPid&&!(pk==='action'&&prev.phase.actor===myPid)){banner('À toi !');buzz(150)}
     if(v.game==='bluff'&&k==='respond'&&v.phase.elig.includes(myPid)&&(pk!=='respond'||prev.phase.stage!==v.phase.stage)&&v.phase.target===myPid)buzz([100,60,100]);
     if(v.game==='bluff'&&v.B&&v.B.reveal&&JSON.stringify(v.B.reveal)!==JSON.stringify(prev.B&&prev.B.reveal))banner(v.B.reveal.ok?'✅ Il disait vrai !':'🤥 Menteur démasqué !');
-    if(v.game==='loup'&&k!==pk){if(k==='night')banner('🌙 La nuit tombe…');if(k==='day')banner('☀️ Le village se réveille');if(k==='verdict')banner('⚖️ Verdict');}
+    if(v.game==='loup'&&k!==pk){if(k==='night')banner('🌙 La nuit tombe…');if(k==='day'&&pk!=='mayor')banner('☀️ Le village se réveille');if(k==='mayor')banner('🎖️ Élection du Maire');if(k==='verdict')banner('⚖️ Verdict');}
   }
   if(v.status==='end'&&prev&&prev.status!=='end')banner(v.end.winners.includes(myPid)?'🏆 Victoire !':'Fin de partie');
   if(!prev||!v.phase||!prev.phase||prev.phase.k!==v.phase.k||prev.phase.actor!==v.phase.actor)ui.sel={};
@@ -994,6 +1100,7 @@ function receive(v){
 function bindGame(){
   app.onclick=e=>{
     const b=e.target.closest('button');if(!b||b.disabled)return;const d=b.dataset;
+    if(d.note){const k=notesKey(V);const n=store.get(k,{});n[d.note]=n[d.note]==='w'?'i':n[d.note]==='i'?'':'w';store.set(k,n);return render()}
     switch(d.act){
       case 'pickact':ui.sel.act=ui.sel.act===d.k?null:d.k;render();break;
       case 'doact':send({type:'action',act:ui.sel.act,target:d.t});ui.sel={};break;
@@ -1002,6 +1109,11 @@ function bindGame(){
       case 'keep':{const i=+d.i;const k=ui.sel.keep||[];ui.sel.keep=k.includes(i)?k.filter(x=>x!==i):[...k,i].slice(-V.phase.keep);render();break}
       case 'doexch':send({type:'exchange',keep:ui.sel.keep});ui.sel={};break;
       case 'wolf':send({type:'wolf',target:d.t});break;
+      case 'guard':send({type:'guard',target:d.t});break;
+      case 'mayor':send({type:'mayor',target:d.t});break;
+      case 'lov':{const l=ui.sel.lov||[];ui.sel.lov=l.includes(d.t)?l.filter(x=>x!==d.t):[...l,d.t].slice(-2);render();break}
+      case 'cupid':send({type:'cupid',a:ui.sel.lov[0],b:ui.sel.lov[1]});ui.sel={};break;
+      case 'introok':ui.intro=V.gid;render();break;
       case 'seer':send({type:'seer',target:d.t});break;
       case 'wsave':ui.sel.save=!ui.sel.save;render();break;
       case 'wpoison':ui.sel.poison=ui.sel.poison===d.t?null:d.t;render();break;
