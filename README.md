@@ -9,7 +9,9 @@ on ment, on se piège. Une partie dure 10 à 15 minutes.
   Partager ou Voler, Le Dé du Menteur, L'Enchère truquée, Le Chiffre unique.
 - Coups bas anonymes à tout moment : Pickpocket, Espion, Bâillon, Gage (accent imposé), Brouillage
   d'écran, Racket, Quitte ou double, Bouclier, Miroir. Le « grand déballage » révèle tout à la fin.
-- Des robots peuvent compléter la table.
+- Messagerie : à tous, à son équipe ou en privé. Équipes secrètes (20 % des gains des coéquipiers), agent double
+  possible. Les faux messages (carte ou robots) se signent du nom d'un autre : vérifier coûte 20 pièces.
+- Des robots peuvent compléter la table, et ils bluffent aussi.
 - Le plus riche gagne.
 
 Un joueur crée le salon (son téléphone sert de serveur, il garde la page ouverte), les autres scannent

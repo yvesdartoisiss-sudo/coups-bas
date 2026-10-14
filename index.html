@@ -131,6 +131,32 @@ input{font:inherit}
 .feed div{background:rgba(0,0,0,.22);border-radius:12px;padding:6px 10px;color:var(--cream-2)}
 .feed div.say{background:var(--cream-2);color:var(--ink);border-bottom-left-radius:3px}
 .feed div.bad{background:rgba(224,82,63,.25);color:#ffd6cf}
+.tabs{display:flex;gap:4px;background:rgba(0,0,0,.28);border-radius:14px;padding:4px;margin-top:14px}
+.tab{flex:1;border:0;border-radius:10px;padding:.55em .3em;background:transparent;color:var(--cream-2);font-weight:600;font-size:.92rem;position:relative}
+.tab[aria-selected="true"]{background:var(--cream);color:var(--ink)}
+.tab .badge{position:absolute;top:2px;right:6px;background:var(--red);color:#fff;border-radius:999px;font-size:.7rem;min-width:1.4em;padding:0 .3em;line-height:1.4em}
+.msgs{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow-y:auto;padding:2px}
+.msg{background:#fff;border-radius:14px;border-bottom-left-radius:4px;padding:6px 10px;max-width:88%;align-self:flex-start;border:2px solid transparent}
+.msg.mine{align-self:flex-end;background:var(--felt);color:var(--cream);border-bottom-left-radius:14px;border-bottom-right-radius:4px}
+.msg.priv{border-color:var(--red)}
+.msg.team{border-color:var(--blue)}
+.msg .mh{font-size:.72rem;font-weight:600;opacity:.75;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.msg .vf{border:0;background:var(--cream-2);border-radius:999px;font-size:.7rem;padding:.1em .6em;color:var(--ink);font-weight:600}
+.msg .tagok{color:var(--ok);font-weight:700}.msg .tagko{color:var(--red);font-weight:700}
+.compose{display:grid;gap:8px;margin-top:10px}
+.compose select,.compose input{background:#fff;border:2px solid var(--cream-2);border-radius:10px;color:var(--ink);padding:.55em .7em;min-width:0;font:inherit}
+.compose .line{display:flex;gap:8px}
+.compose .line input{flex:1;width:0}
+.compose>*{min-width:0;max-width:100%}
+.compose select{width:100%}
+.compose .line .btn{flex:none}
+.quick{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.quick button{flex:none;border:0;background:var(--cream-2);border-radius:999px;padding:.35em .8em;font-size:.82rem;color:var(--ink)}
+.forge{background:#fff3d6;border:2px dashed var(--brass-2);border-radius:14px;padding:10px}
+.team{background:var(--cream-2);border-radius:14px;padding:10px 12px;margin-top:8px}
+.team h3{font-size:1.15rem;color:var(--felt)}
+.team .mem{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.team .mem span{background:#fff;border-radius:999px;padding:.2em .6em;font-size:.85rem}
 .hostbar{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 .toasts{position:fixed;left:0;right:0;bottom:0;padding:0 max(12px,env(safe-area-inset-right,0px)) max(12px,env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));display:grid;gap:8px;justify-items:center;z-index:50;pointer-events:none}
 .toast{background:var(--ink);color:var(--cream);border:2px solid var(--brass);border-radius:14px;padding:10px 14px;max-width:min(520px,100%);box-shadow:0 8px 20px rgba(0,0,0,.4);animation:up .3s ease-out}
@@ -211,7 +237,12 @@ const TRAPS={
   racket:{n:'Racket',e:'💸',t:0,w:2,d:'Chaque autre joueur te donne 15 pièces.'},
   double:{n:'Quitte ou double',e:'✖️',t:0,w:2,d:'Tes gains de cette manche sont doublés.'},
   bouclier:{n:'Bouclier',e:'🛡️',pas:1,w:3,d:"Automatique : bloque le prochain coup bas contre toi et te dit qui l'a joué."},
-  miroir:{n:'Miroir',e:'🪞',pas:1,w:2,hard:1,d:"Automatique : renvoie le prochain coup bas à son auteur, devant tout le monde."}};
+  miroir:{n:'Miroir',e:'🪞',pas:1,w:2,hard:1,d:"Automatique : renvoie le prochain coup bas à son auteur, devant tout le monde."},
+  faux:{n:'Faux message',e:'✉️',forge:1,w:4,d:"Envoie un message signé du nom d'un autre joueur. Pur bluff."}};
+const TEAM_NAMES=['Les Crêpes 🥞','Les Pirates 🏴‍☠️','Les Chaussettes 🧦','Les Licornes 🦄','Les Moustaches 🥸','Les Fourchettes 🍴','Les Ninjas 🥷','Les Patates 🥔'];
+const QUICK=['Je partage, promis 🤞','On fait équipe ? 🤝','Vote contre {x} !','Fais-moi confiance 😇','Méfie-toi de {x}…','Je suis le témoin 👀','Menteur ! 🤥','Pas moi ! 🙅'];
+const BOT_PRIVATE=['Psst… on s’allie ? Je vote comme toi 🤝','Entre nous : {x} ment, j’en suis sûr.','Je partage avec toi si tu partages avec moi.','Ne fais pas confiance à {x}, crois-moi.','J’ai espionné {x} : c’est louche…'];
+const FORGE_LINES=['Je vais te voler, désolé 😈','Vote contre {x}, c’est le coupable !','Je suis le témoin : c’est {x} !','Fais-moi confiance, je partage 🤞','Ne dis rien, mais je suis dans l’équipe de {x}.','J’ai un Bouclier, essaie pour voir 😏','Je mise tout sur le coffre, il vaut une fortune !'];
 const ACCENTS=['de pirate 🏴‍☠️','de robot 🤖','marseillais ☀️',"de grand-mère qui n'entend rien 👵",'de présentateur télé 📺','en chuchotant 🤫','de cow-boy 🤠','en chantant 🎤'];
 const BOT_LINES={
   intrus:['Moi j’ai dit un mot super évident, c’est pas moi !','Je trouve que quelqu’un hésite beaucoup… 🤨','Bip boup. Je suis 100 % innocent.','Le dernier mot était louche, non ?'],
@@ -236,7 +267,15 @@ const sstore={get(k,d){try{const v=sessionStorage.getItem(k);return v?JSON.parse
 let G=null;
 const P=id=>G.players.find(p=>p.id===id);
 const nm=p=>p?`${p.av} ${p.name}`:'?';
-function newGame(code,mode,manches){return {code,id:uid(),mode,manches,status:'lobby',players:[],m:0,order:[],phase:null,cur:null,feed:[],history:[],seq:0}}
+function newGame(code,mode,manches){return {code,id:uid(),mode,manches,status:'lobby',players:[],m:0,order:[],phase:null,cur:null,feed:[],history:[],msgs:[],teams:[],seq:0}}
+/* --- Messages et équipes --- */
+const fillX=(t,self)=>t.replace(/\{x\}/g,()=>{const o=G.players.filter(p=>p.id!==self);return o.length?pick(o).name:'quelqu’un'});
+function pushMsg(real,from,to,txt,fake){G.msgs.push({i:++G.seq,real,from,to,txt:String(txt).slice(0,140),fake:!!fake});if(G.msgs.length>200)G.msgs.shift()}
+const teamsOf=pid=>G.teams.filter(t=>t.members.includes(pid));
+const canSee=(m,pid)=>m.to==='all'||m.to===pid||m.real===pid||(m.to.startsWith('team:')&&G.teams.some(t=>'team:'+t.id===m.to&&t.members.includes(pid)));
+function joinTeam(t,p){t.invites=t.invites.filter(x=>x!==p.id);if(teamsOf(p.id).length>=2||t.members.includes(p.id))return false;t.members.push(p.id);pushMsg(p.id,p.id,'team:'+t.id,`${p.av} ${p.name} rejoint l'équipe !`);return true}
+function leaveTeam(t,pid){t.members=t.members.filter(x=>x!==pid);if(t.founder===pid)t.founder=t.members[0]||null;if(!t.members.length)G.teams=G.teams.filter(x=>x!==t)}
+function createTeam(p){const used=G.teams.map(t=>t.name);const t={id:uid(),name:TEAM_NAMES.find(n=>!used.includes(n))||'Les Anonymes 🎩',founder:p.id,members:[p.id],invites:[]};G.teams.push(t);return t}
 function feed(t,cls){G.feed.unshift({i:++G.seq,t,c:cls||''});G.feed.length=Math.min(G.feed.length,40)}
 function tell(p,t){if(!p||p.bot)return;p.inbox.push({i:++G.seq,t});if(p.inbox.length>8)p.inbox.shift()}
 function addPlayer(id,name,av,bot){
@@ -251,7 +290,7 @@ function lose(p,n){const x=Math.min(p.gold,Math.max(0,n));p.gold-=x;return x}
 function phase(k,secs,data={}){G.phase={k,...data,deadline:Date.now()+secs*1000,total:secs}}
 function startGame(){
   G.players.forEach(p=>{p.gold=START;p.hand=[];p.fx={};p.inbox=[];p.stats={lies:0,played:0,taken:0,won:0};p.used=-1;deal(p,2)});
-  G.feed=[];G.history=[];G.m=0;G.status='play';
+  G.feed=[];G.history=[];G.msgs=[];G.teams=[];G.m=0;G.status='play';G.players.forEach(p=>{p.verified={};p.lastMsg=0});
   const n=G.players.length;const ok=Object.keys(GAMES).filter(k=>GAMES[k].min<=n);
   const order=[];let bag=[];
   while(order.length<G.manches){if(!bag.length)bag=shuffle([...ok]);let g=bag.shift();if(order.length&&order[order.length-1]===g&&bag.length){bag.push(g);g=bag.shift()}order.push(g)}
@@ -366,6 +405,7 @@ function reveal(){
     R.big=win.length?`Chiffres uniques : ${win.map(([id,n])=>`${P(id).name} (${n})`).join(', ')}`:'Tout le monde s’est copié : personne ne gagne !';
   }
   G.players.forEach(p=>R.d[p.id]=p.gold-before[p.id]);
+  G.teams.forEach(t=>t.members.forEach(mid=>{const m=P(mid);if(!m)return;let b=0;t.members.forEach(o=>{if(o!==mid)b+=Math.max(0,R.d[o]||0)*.2});b=Math.round(b/5)*5;if(b>0){m.gold+=b;tell(m,`🤝 ${t.name} : commission d'équipe +${b}`)}}));
   G.cur.R=R;feed(`${GAMES[g].e} ${R.big}`);
   phase('reveal',14);
 }
@@ -383,7 +423,8 @@ function endGame(){
   feed(`🏆 ${nm(r[0])} gagne la partie avec ${r[0].gold} pièces !`);
 }
 /* --- Coups bas : anonymes, à tout moment pendant la manche --- */
-function secretOf(t){
+function secretOf(t){const tm=teamsOf(t.id);return secretGame(t)+(tm.length?` Équipe${tm.length>1?'s':''} : ${tm.map(x=>x.name).join(' + ')}${tm.length>1?' (agent double !)':''}.`:' Aucune équipe.')}
+function secretGame(t){
   const c=G.cur;
   switch(c.g){
     case 'intrus':return `son mot est « ${t.id===c.und?c.pair[1]:c.pair[0]} »${t.id===c.und?' (c’est l’intrus !)':''}`;
@@ -398,6 +439,7 @@ function secretOf(t){
 function playTrap(p,idx,targetId){
   const k=p.hand[idx];const tr=TRAPS[k];
   if(!tr||tr.pas)return 'Cette carte agit toute seule quand on t’attaque.';
+  if(tr.forge)return 'Le faux message s’envoie depuis l’onglet Messages.';
   if(!G.phase||G.phase.k!=='play')return 'Les coups bas se jouent pendant une manche.';
   if(p.used===G.m)return 'Un seul coup bas par manche.';
   let t=null;if(tr.t){t=P(targetId);if(!t||t.id===p.id)return 'Choisis une cible.'}
@@ -433,7 +475,8 @@ function botTick(){
   const c=G.cur;const k=G.phase.k;
   G.players.filter(p=>p.bot).forEach(b=>{
     if(k==='play'){
-      if(!G.botSaid[b.id]&&Math.random()<.12){G.botSaid[b.id]=1;feed(`${b.av} ${b.name} : « ${pick(BOT_LINES[c.g])} »`,'say')}
+      if(!G.botSaid[b.id]&&Math.random()<.12){G.botSaid[b.id]=1;pushMsg(b.id,b.id,'all',fillX(pick(BOT_LINES[c.g]),b.id))}
+      botSocial(b);
       if(b.used!==G.m&&b.hand.some(x=>!TRAPS[x].pas)&&Math.random()<.04){const i=b.hand.findIndex(x=>!TRAPS[x].pas);const t=pick(G.players.filter(x=>x.id!==b.id));playTrap(b,i,t.id)}
       if(c.acts[b.id]!=null||Math.random()<.6)return;
       const others=G.players.filter(x=>x.id!==b.id).map(x=>x.id);
@@ -447,6 +490,14 @@ function botTick(){
       }
     }
   });
+}
+function botSocial(b){
+  const humans=G.players.filter(x=>!x.bot&&x.id!==b.id);if(!humans.length)return;
+  const r=Math.random();
+  if(r<.012)pushMsg(b.id,b.id,pick(humans).id,fillX(pick(BOT_PRIVATE),b.id));
+  else if(r<.02){const as=pick(G.players.filter(x=>x.id!==b.id));const to=pick(humans.filter(h=>h.id!==as.id).concat(['all']));if(to){const tid=to==='all'?'all':to.id;pushMsg(b.id,as.id,tid,fillX(pick(FORGE_LINES),as.id),true);G.history.push({f:b.id,t:tid==='all'?null:tid,k:'faux',x:'au nom de '+as.name})}}
+  G.teams.filter(t=>t.invites.includes(b.id)).forEach(t=>{if(Math.random()<.15){if(Math.random()<.75)joinTeam(t,b);else t.invites=t.invites.filter(x=>x!==b.id)}});
+  if(!teamsOf(b.id).length&&Math.random()<.008){const t=createTeam(b);const h=pick(humans);if(!t.members.includes(h.id)&&teamsOf(h.id).length<2){t.invites.push(h.id);pushMsg(b.id,b.id,h.id,`Je t'invite dans ${t.name}. On partage nos gains 🤝`)}}
 }
 /* --- Actions --- */
 function handleAct(pid,a){
@@ -462,6 +513,26 @@ function handleAct(pid,a){
   }
   if(G.status==='end'){if(a.type==='again'&&pid===hostPid){G.status='lobby';G.phase=null;G.feed=[];G.id=uid()}return sync()}
   switch(a.type){
+    case 'msg':{
+      const txt=String(a.txt||'').trim().slice(0,140);if(!txt)break;
+      if(Date.now()-(p.lastMsg||0)<1200)return err('Doucement, un message à la fois !');
+      const to=a.to==='all'||(typeof a.to==='string'&&a.to.startsWith('team:')&&G.teams.some(t=>'team:'+t.id===a.to&&t.members.includes(p.id)))||(P(a.to)&&a.to!==p.id)?a.to:null;
+      if(!to)break;p.lastMsg=Date.now();pushMsg(p.id,p.id,to,txt);break}
+    case 'forge':{
+      const i=p.hand.indexOf('faux');if(i<0)break;const as=P(a.as);const txt=String(a.txt||'').trim().slice(0,140);
+      if(!as||as.id===p.id||!txt){err('Choisis au nom de qui, et écris le message.');break}
+      const to=a.to==='all'?'all':(P(a.to)&&a.to!==p.id?a.to:null);if(!to)break;
+      p.hand.splice(i,1);p.stats.played++;pushMsg(p.id,as.id,to,txt,true);G.history.push({f:p.id,t:to==='all'?null:to,k:'faux',x:'au nom de '+as.name});tell(p,`✉️ Faux message envoyé au nom de ${as.name}.`);break}
+    case 'verify':{
+      const m=G.msgs.find(x=>x.i===a.i);if(!m||!canSee(m,p.id)||m.real===p.id||m.from===p.id||p.verified[m.i]!=null)break;
+      if(p.gold<20){err('Il faut 20 pièces pour vérifier.');break}
+      lose(p,20);p.verified[m.i]=m.fake?0:1;tell(p,m.fake?`🔍 FAUX ! Ce message n'a pas été écrit par ${P(m.from).name}.`:`🔍 Authentique : c'est bien ${P(m.from).name} qui l'a écrit.`);break}
+    case 'team_create':if(teamsOf(p.id).length>=2){err('Deux équipes maximum.');break}{const t=createTeam(p);tell(p,`🤝 Tu as fondé ${t.name}. Invite des joueurs !`)}break;
+    case 'team_invite':{const t=G.teams.find(x=>x.id===a.tid);const q=P(a.pid);if(!t||!q||!t.members.includes(p.id)||t.members.includes(q.id)||t.invites.includes(q.id))break;t.invites.push(q.id);tell(q,`🤝 ${p.name} t'invite dans ${t.name} (onglet Équipes).`);pushMsg(p.id,p.id,'team:'+t.id,`J'ai invité ${q.av} ${q.name}.`);break}
+    case 'team_accept':{const t=G.teams.find(x=>x.id===a.tid);if(!t||!t.invites.includes(p.id))break;if(!joinTeam(t,p))err('Deux équipes maximum.');break}
+    case 'team_decline':{const t=G.teams.find(x=>x.id===a.tid);if(t)t.invites=t.invites.filter(x=>x!==p.id);break}
+    case 'team_leave':{const t=G.teams.find(x=>x.id===a.tid);if(!t||!t.members.includes(p.id))break;pushMsg(p.id,p.id,'team:'+t.id,`${p.av} ${p.name} quitte l'équipe.`);leaveTeam(t,p.id);break}
+    case 'team_kick':{const t=G.teams.find(x=>x.id===a.tid);if(!t||t.founder!==p.id||a.pid===p.id||!t.members.includes(a.pid))break;const q=P(a.pid);leaveTeam(t,a.pid);pushMsg(p.id,p.id,'team:'+t.id,`🚪 ${q.name} est exclu de l'équipe !`);tell(q,`🚪 Tu as été exclu de ${t.name}. Démasqué ?`);break}
     case 'act':if(G.phase.k==='play')act(p,a);break;
     case 'trap':{const e=playTrap(p,a.idx,a.target);if(e)err(e)}break;
     case 'next':if(pid!==hostPid)break;if(G.phase.k==='intro')playPhase();else if(G.phase.k==='play')reveal();else if(G.phase.k==='reveal')nextManche();break;
@@ -494,6 +565,8 @@ function viewFor(pid){
     game:c?c.g:null,phase:ph?{k:ph.k,left:Math.max(0,(ph.deadline||0)-Date.now()),total:ph.total}:null,
     players:G.players.map(p=>({id:p.id,name:p.name,av:p.av,gold:p.gold,bot:p.bot,online:p.online,fx:{baillon:!!p.fx.baillon,gage:p.fx.gage||null}})),
     feed:G.feed.slice(0,14),sec,
+    msgs:G.msgs.filter(m=>canSee(m,pid)).slice(-40).map(m=>({i:m.i,from:m.from,to:m.to,txt:m.txt,mine:m.real===pid,forged:m.fake&&m.real===pid,notMe:m.from===pid&&m.real!==pid,ok:me&&me.verified?me.verified[m.i]:undefined})),
+    teams:(G.teams||[]).filter(t=>t.members.includes(pid)||t.invites.includes(pid)).map(t=>({id:t.id,name:t.name,founder:t.founder,members:t.members,invited:!t.members.includes(pid)})),
     me:me?{id:me.id,hand:me.hand,inbox:me.inbox,used:me.used===G.m,scramble:me.fx.scramble&&me.fx.scramble>Date.now()?me.fx.scramble-Date.now():0,baillon:!!me.fx.baillon,gage:me.fx.gage||null,dbl:me.fx.double===G.m}:null,
     end:G.status==='end'?G.end:null
   };
@@ -592,6 +665,7 @@ function beep(f=660){try{const c=new (window.AudioContext||window.webkitAudioCon
 const threeRules=`<div class="three">
   <div><span>🗣️</span><span><b>On parle à voix haute.</b> Chaque manche est un mini-jeu de bluff de moins d'une minute, tout le monde joue en même temps.</span></div>
   <div><span>😈</span><span><b>Coups bas anonymes.</b> À tout moment, vole, espionne, bâillonne ou brouille quelqu'un. Personne ne sait qui a fait quoi… jusqu'à la fin.</span></div>
+  <div><span>💬</span><span><b>Messages, équipes et faux messages.</b> Écris à tous ou en privé, monte des équipes secrètes, joue l'agent double… et méfie-toi : un message peut être signé d'un faux nom.</span></div>
   <div><span>🏆</span><span><b>Le plus riche gagne.</b> Tout le monde commence avec 100 pièces. Une partie dure 10 à 15 minutes.</span></div></div>`;
 function renderHome(){
   const qs=new URLSearchParams(location.search);const code=(qs.get('salon')||'').toUpperCase();
@@ -755,8 +829,8 @@ function revealBody(v){
 function handHtml(v){
   const me=v.me;const s=ui.sel.trap;const t=s!=null?TRAPS[me.hand[s]]:null;const live=v.phase.k==='play';
   return `<div class="hbar"><h3>Tes coups bas <small>${me.used?'déjà joué cette manche':live?'un par manche, anonyme':'jouables pendant la manche'}</small></h3>
-    <div class="hand">${me.hand.map((k,i)=>{const c=TRAPS[k];return `<button class="tc ${c.pas?'pas':''}" data-trap="${i}" aria-pressed="${s===i}" ${c.pas||me.used||!live?'disabled':''}><span class="te">${c.e}</span><b>${esc(c.n)}</b><span>${esc(c.d)}</span></button>`}).join('')||'<p class="small muted">Plus de carte : tu en reçois une à chaque manche.</p>'}</div>
-    ${t&&live&&!me.used?(t.t?`<p class="small">Sur qui jouer « ${esc(t.n)} » ?</p><div class="picks">${v.players.filter(p=>p.id!==myPid).map(p=>`<button class="chip" data-act="trapgo" data-t="${p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`:`<button class="btn red sm" data-act="trapgo">Jouer « ${esc(t.n)} »</button>`):''}
+    <div class="hand">${me.hand.map((k,i)=>{const c=TRAPS[k];return `<button class="tc ${c.pas?'pas':''}" data-trap="${i}" aria-pressed="${s===i}" ${c.pas||(!c.forge&&(me.used||!live))?'disabled':''}><span class="te">${c.e}</span><b>${esc(c.n)}</b><span>${esc(c.d)}</span></button>`}).join('')||'<p class="small muted">Plus de carte : tu en reçois une à chaque manche.</p>'}</div>
+    ${t&&t.forge?'':t&&live&&!me.used?(t.t?`<p class="small">Sur qui jouer « ${esc(t.n)} » ?</p><div class="picks">${v.players.filter(p=>p.id!==myPid).map(p=>`<button class="chip" data-act="trapgo" data-t="${p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`:`<button class="btn red sm" data-act="trapgo">Jouer « ${esc(t.n)} »</button>`):''}
   </div>`;
 }
 function renderGame(v){
@@ -775,10 +849,47 @@ function renderGame(v){
     ${myPid===v.host?`<div class="hostbar"><button class="btn sm alt" data-act="next">${k==='intro'?'Commencer':k==='play'?'Terminer la manche':v.m+1>=v.manches?'Voir le podium':'Manche suivante'} ➜</button></div>`:''}
   </section></div>
   ${handHtml(v)}
-  <div class="feed">${v.feed.slice(0,7).map(f=>`<div class="${f.c}">${esc(f.t)}</div>`).join('')}</div>`;
+  ${socialHtml(v)}`;
   document.body.classList.toggle('scrambled',v.me.scramble>0);
   if(v.me.scramble>0){clearTimeout(ui.scrT);ui.scrT=setTimeout(()=>document.body.classList.remove('scrambled'),v.me.scramble)}
   updTimer();
+}
+function destName(v,to){if(to==='all')return 'à tous';if(to.startsWith('team:')){const t=v.teams.find(x=>'team:'+x.id===to);return t?t.name:'équipe'}return '🔒 à '+pn(v,to)}
+function socialHtml(v){
+  const tab=ui.tab||'msg';const unread=v.msgs.filter(m=>m.i>(ui.seenMsg||0)&&!m.mine).length;const inv=v.teams.filter(t=>t.invited).length;
+  let body='';
+  if(tab==='msg'){
+    const myTeams=v.teams.filter(t=>!t.invited);
+    const opts=`<option value="all">📣 Tout le monde</option>${myTeams.map(t=>`<option value="team:${t.id}">🤝 ${esc(t.name)}</option>`).join('')}${v.players.filter(p=>p.id!==myPid).map(p=>`<option value="${p.id}">🔒 ${p.av} ${esc(p.name)} (privé)</option>`).join('')}`;
+    const hasFaux=v.me.hand.includes('faux');
+    body=`<div class="msgs" id="msgs">${v.msgs.map(m=>{
+      const priv=m.to!=='all'&&!m.to.startsWith('team:');const team=m.to.startsWith('team:');
+      const head=m.forged?`✉️ faux au nom de ${pn(v,m.from)} · ${destName(v,m.to)}`:`${m.mine?'Toi':pn(v,m.from)} · ${destName(v,m.to)}`;
+      const check=m.mine||m.from===myPid?'':m.ok===1?'<span class="tagok">✅ authentique</span>':m.ok===0?'<span class="tagko">❌ FAUX</span>':`<button class="vf" data-act="verify" data-i="${m.i}">🔍 vérifier (20)</button>`;
+      return `<div class="msg ${m.mine?'mine':''} ${priv?'priv':''} ${team?'team':''}"><div class="mh">${head} ${check}</div><div>${esc(m.txt)}</div>${m.notMe?'<div class="small tagko">⚠️ Ce n’est pas toi qui as écrit ça !</div>':''}</div>`}).join('')||'<p class="small" style="color:var(--ink-2)">Aucun message. Lance les négociations !</p>'}</div>
+    ${ui.forge&&hasFaux?`<form class="compose forge" id="forgeForm"><b>✉️ Faux message</b>
+      <select id="forgeAs" aria-label="Au nom de">${v.players.filter(p=>p.id!==myPid).map(p=>`<option value="${p.id}">Au nom de ${p.av} ${esc(p.name)}</option>`).join('')}</select>
+      <select id="forgeTo" aria-label="Destinataire"><option value="all">📣 À tout le monde</option>${v.players.filter(p=>p.id!==myPid).map(p=>`<option value="${p.id}">🔒 À ${p.av} ${esc(p.name)}</option>`).join('')}</select>
+      <div class="line"><input id="forgeIn" maxlength="140" placeholder="Le message piégé…" autocomplete="off"><button class="btn sm red">Envoyer</button></div>
+      <div class="quick">${FORGE_LINES.slice(0,5).map(q=>`<button type="button" data-act="fq" data-q="${esc(q)}">${esc(q.replace('{x}','…'))}</button>`).join('')}</div>
+      <button type="button" class="btn sm alt" data-act="forgeoff">Annuler</button></form>`
+    :`<form class="compose" id="msgForm"><select id="msgTo" aria-label="Destinataire">${opts}</select>
+      <div class="line"><input id="msgIn" maxlength="140" placeholder="Ton message…" autocomplete="off"><button class="btn sm">Envoyer</button></div>
+      <div class="quick">${QUICK.map(q=>`<button type="button" data-act="quick" data-q="${esc(q)}">${esc(q.replace('{x}','…'))}</button>`).join('')}</div>
+      ${hasFaux?'<button type="button" class="btn sm red" data-act="forgeon">✉️ Écrire un faux message</button>':''}</form>`}`;
+  }else if(tab==='team'){
+    body=`<p class="small" style="color:var(--ink-2);margin:0">À chaque manche, tu touches <b>20 %</b> des gains de tes coéquipiers. Les équipes sont secrètes (sauf pour un Espion). Tu peux être dans <b>2 équipes</b> : agent double !</p>
+    ${v.teams.filter(t=>t.invited).map(t=>`<div class="team"><b>🤝 Invitation : ${esc(t.name)}</b><div class="mem">${t.members.map(id=>`<span>${pn(v,id)}</span>`).join('')}</div><div class="row" style="margin-top:8px"><button class="btn sm green" data-act="team_accept" data-tid="${t.id}">Rejoindre</button><button class="btn sm alt" data-act="team_decline" data-tid="${t.id}">Refuser</button></div></div>`).join('')}
+    ${v.teams.filter(t=>!t.invited).map(t=>{const out=v.players.filter(p=>!t.members.includes(p.id));return `<div class="team"><h3>${esc(t.name)}</h3>
+      <div class="mem">${t.members.map(id=>`<span>${pn(v,id)}${id===t.founder?' 👑':''}${t.founder===myPid&&id!==myPid?` <button class="vf" data-act="team_kick" data-tid="${t.id}" data-pid="${id}">exclure</button>`:''}</span>`).join('')}</div>
+      ${out.length?`<p class="small" style="margin:8px 0 0">Inviter :</p><div class="picks" style="margin-top:4px">${out.map(p=>`<button class="chip" data-act="team_invite" data-tid="${t.id}" data-pid="${p.id}">${p.av} ${esc(p.name)}</button>`).join('')}</div>`:''}
+      <div class="row" style="margin-top:8px"><button class="btn sm alt" data-act="team_leave" data-tid="${t.id}">Quitter l'équipe</button></div></div>`}).join('')}
+    ${v.teams.filter(t=>!t.invited).length<2?'<button class="btn sm" style="margin-top:10px" data-act="team_create">+ Fonder une équipe</button>':''}`;
+  }else{
+    body=`<div class="feed" style="margin:0">${v.feed.slice(0,14).map(f=>`<div class="${f.c}">${esc(f.t)}</div>`).join('')}</div>`;
+  }
+  return `<div class="tabs" role="tablist">${[['msg','💬 Messages',unread&&tab!=='msg'?unread:0],['team','🤝 Équipes',inv],['table','📰 Table',0]].map(([k,l,b])=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab===k}">${l}${b?`<span class="badge">${b}</span>`:''}</button>`).join('')}</div>
+  <section class="card" style="margin-top:8px;${tab==='table'?'background:transparent;box-shadow:none;padding:0':''}">${body}</section>`;
 }
 function renderEnd(v){
   const E=v.end;const w=pp(v,E.rank[0].id);
@@ -794,11 +905,20 @@ function renderEnd(v){
 }
 function updTimer(){const t=$('#tbar');if(t)t.style.width=Math.max(0,Math.min(100,(ui.deadline-Date.now())/ui.total/10))+'%'}
 setInterval(updTimer,500);
-function render(){const v=V;if(!v)return;if(v.status==='lobby')renderLobby(v);else if(v.status==='end')renderEnd(v);else renderGame(v);if(v.status!=='lobby')bindGame()}
+function render(){const v=V;if(!v)return;
+  const keep={};['msgIn','msgTo','forgeIn','forgeAs','forgeTo'].forEach(id=>{const el=document.getElementById(id);if(el)keep[id]=el.value});
+  const fid=document.activeElement&&document.activeElement.id;const msgsEl=$('#msgs');const atBottom=!msgsEl||msgsEl.scrollHeight-msgsEl.scrollTop-msgsEl.clientHeight<30;
+  if(v.status==='lobby')renderLobby(v);else if(v.status==='end')renderEnd(v);else renderGame(v);
+  Object.entries(keep).forEach(([id,val])=>{const el=document.getElementById(id);if(el&&[...(el.options||[])].every(o=>true)){if(el.tagName!=='SELECT'||[...el.options].some(o=>o.value===val))el.value=val}});
+  if(fid){const el=document.getElementById(fid);if(el){el.focus({preventScroll:true});if(el.setSelectionRange&&el.value)try{el.setSelectionRange(el.value.length,el.value.length)}catch(e){}}}
+  const m2=$('#msgs');if(m2&&atBottom)m2.scrollTop=m2.scrollHeight;
+  if(ui.tab==='msg'&&v.msgs&&v.msgs.length)ui.seenMsg=Math.max(ui.seenMsg||0,...v.msgs.map(m=>m.i));
+  if(v.status!=='lobby')bindGame()}
 function receive(v){
   const prev=V;V=v;
   if(v.phase&&v.phase.left!=null){ui.deadline=Date.now()+v.phase.left;ui.total=v.phase.total||20}
   if(v.me){v.me.inbox.forEach(m=>{if(m.i>ui.lastInbox)toast(m.t)});ui.lastInbox=Math.max(ui.lastInbox,...v.me.inbox.map(m=>m.i),0)}
+  if(v.msgs){const top=Math.max(0,...v.msgs.map(m=>m.i));if(ui.lastMsgI!=null)v.msgs.filter(m=>m.i>ui.lastMsgI&&!m.mine&&m.to!=='all').forEach(m=>{toast(`${m.to.startsWith('team:')?'🤝':'🔒'} ${pn(v,m.from).replace(/&[^;]+;/g,'')} : ${m.txt}`);buzz(60)});ui.lastMsgI=top}
   const key=v.status+':'+v.m+':'+(v.phase&&v.phase.k);
   if(prev&&key!==ui.key){
     ui.sel={};
@@ -819,8 +939,15 @@ function receive(v){
 function bindGame(){
   app.onclick=e=>{
     const b=e.target.closest('button');if(!b||b.disabled)return;const d=b.dataset;const me=V&&pp(V,myPid);
-    if(d.trap!=null){const i=+d.trap;ui.sel.trap=ui.sel.trap===i?null:i;return render()}
+    if(d.tab){ui.tab=d.tab;return render()}
+    if(d.trap!=null){const i=+d.trap;if(V.me.hand[i]==='faux'){ui.tab='msg';ui.forge=true;ui.sel.trap=null;render();const f=$('#forgeIn');if(f)f.scrollIntoView({block:'center'});return}ui.sel.trap=ui.sel.trap===i?null:i;return render()}
     switch(d.act){
+      case 'verify':send({type:'verify',i:+d.i});break;
+      case 'quick':{const to=$('#msgTo').value;send({type:'msg',to,txt:d.q.replace(/\{x\}/g,()=>{const o=V.players.filter(p=>p.id!==myPid&&p.id!==to);return o.length?pick(o).name:'quelqu’un'})});break}
+      case 'fq':{const i=$('#forgeIn');i.value=d.q.replace(/\{x\}/g,()=>{const o=V.players.filter(p=>p.id!==myPid);return pick(o).name});i.focus();break}
+      case 'forgeon':ui.forge=true;render();break;
+      case 'forgeoff':ui.forge=false;render();break;
+      case 'team_create':case 'team_leave':case 'team_accept':case 'team_decline':case 'team_invite':case 'team_kick':send({type:d.act,tid:d.tid,pid:d.pid});break;
       case 'vote':send({type:'act',vote:d.id});break;
       case 'choice':send({type:'act',choice:d.c});break;
       case 'claim':send({type:'act',claim:+d.n});break;
@@ -834,6 +961,10 @@ function bindGame(){
       case 'next':send({type:'next'});break;
       case 'again':send({type:'again'});break;
     }
+  };
+  app.onsubmit=e=>{e.preventDefault();
+    if(e.target.id==='msgForm'){const i=$('#msgIn');const t=i.value.trim();if(t){send({type:'msg',to:$('#msgTo').value,txt:t});i.value=''}}
+    if(e.target.id==='forgeForm'){const t=$('#forgeIn').value.trim();if(t){send({type:'forge',as:$('#forgeAs').value,to:$('#forgeTo').value,txt:t});ui.forge=false;$('#forgeIn').value=''}}
   };
 }
 (function boot(){
