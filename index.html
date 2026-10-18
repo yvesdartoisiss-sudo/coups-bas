@@ -178,7 +178,7 @@ button.char{cursor:pointer}
 <div class="wrap" id="app"></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 <div class="banner" id="banner"></div>
-<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.3.5/dist/mqtt.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
 'use strict';
@@ -831,31 +831,46 @@ function viewFor(pid){
 /* =====================================================================
    RÉSEAU
    ===================================================================== */
-const LOCAL=new URLSearchParams(location.search).has('local');
-const PREFIX='coupsbas-y1-';
+const QS=new URLSearchParams(location.search);
+const LOCAL=QS.has('local');
+/* Relais internet (MQTT sur WebSocket sécurisé) : marche en 4G comme en Wi-Fi, sans connexion directe
+   entre téléphones. L'hôte écoute sur tous les relais joignables ; chaque joueur essaie les relais
+   un par un jusqu'à obtenir une réponse de l'hôte. */
+const BROKERS=QS.get('broker')?QS.getAll('broker').map(url=>({url})):[
+  {url:'wss://broker.emqx.io:8084/mqtt'},
+  {url:'wss://public.cloud.shiftr.io',username:'public',password:'public'},
+  {url:'wss://broker.hivemq.com:8884/mqtt'},
+  {url:'wss://test.mosquitto.org:8081/mqtt'}];
+const TOPIC='coupsbas-v3/';
+function mqConnect(b,onUp,onMsg){
+  const c=mqtt.connect(b.url,{clientId:'cb'+uid()+uid(),clean:true,reconnectPeriod:4000,connectTimeout:8000,keepalive:30,username:b.username,password:b.password});
+  c.on('connect',()=>onUp(c));c.on('message',(t,buf)=>{let m;try{m=JSON.parse(buf.toString())}catch(e){return}onMsg(t,m,c)});c.on('error',()=>{});
+  return c;
+}
 function makeHostNet(code,h){
-  if(LOCAL){const bc=new BroadcastChannel(PREFIX+code);bc.onmessage=e=>{const m=e.data;if(m.to==='host'&&m.kind==='data')h.onData(m.from,m.d)};setTimeout(()=>h.onOpen(),0);return {send:(id,d)=>bc.postMessage({to:id,kind:'data',d})}}
-  if(typeof Peer==='undefined'){h.onError('nopeer');return null}
-  const conns={};let peer;
-  const boot=()=>{peer=new Peer(PREFIX+code,{debug:0});peer.on('open',()=>h.onOpen());
-    peer.on('connection',c=>{const id=c.connectionId;c.on('open',()=>{conns[id]=c});c.on('data',d=>h.onData(id,d));c.on('close',()=>{delete conns[id];h.onClose(id)});c.on('error',()=>{})});
-    peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
-    peer.on('error',e=>{if(e.type==='unavailable-id')h.onError('taken');else if(['network','server-error','socket-error'].includes(e.type))h.onError('network')})};
-  boot();
-  return {send:(id,d)=>{const c=conns[id];if(c&&c.open)try{c.send(d)}catch(e){}},retry:()=>{try{peer.destroy()}catch(e){}setTimeout(boot,1500)}};
+  if(LOCAL){const bc=new BroadcastChannel('cb-local-'+code);bc.onmessage=e=>{const m=e.data;if(m.to==='host'&&m.kind==='data')h.onData(m.from,m.d)};setTimeout(()=>h.onOpen(),0);return {send:(id,d)=>bc.postMessage({to:id,kind:'data',d})}}
+  if(typeof mqtt==='undefined'){h.onError('nopeer');return null}
+  const base=TOPIC+code;const route={};let opened=false;
+  BROKERS.forEach(b=>mqConnect(b,c=>{c.subscribe(base+'/h');if(!opened){opened=true;h.onOpen()}},(t,m,c)=>{if(!m||typeof m.from!=='string')return;route[m.from]=c;h.onData(m.from,m.d)}));
+  setTimeout(()=>{if(!opened)h.onError('network')},15000);
+  return {send:(id,d)=>{const c=route[id];if(c&&c.connected)try{c.publish(base+'/c/'+id,JSON.stringify(d))}catch(e){}}};
 }
 function makeClientNet(code,h){
-  if(LOCAL){const me='c'+uid();const bc=new BroadcastChannel(PREFIX+code);bc.onmessage=e=>{const m=e.data;if(m.to===me&&m.kind==='data')h.onData(m.d)};setTimeout(()=>h.onOpen(),50);return {send:d=>bc.postMessage({to:'host',from:me,kind:'data',d})}}
-  if(typeof Peer==='undefined'){h.onError('nopeer');return null}
-  let peer,conn,timer=null;
-  const connect=()=>{clearTimeout(timer);conn=peer.connect(PREFIX+code,{reliable:true});conn.on('open',()=>h.onOpen());conn.on('data',d=>h.onData(d));conn.on('close',()=>{h.onClose();timer=setTimeout(connect,2000)});conn.on('error',()=>{})};
-  peer=new Peer({debug:0});peer.on('open',connect);
-  peer.on('disconnected',()=>{try{peer.reconnect()}catch(e){}});
-  peer.on('error',e=>{if(e.type==='peer-unavailable'){h.onError('notfound');clearTimeout(timer);timer=setTimeout(connect,3000)}else if(['network','server-error'].includes(e.type))h.onError('network')});
-  return {send:d=>{if(conn&&conn.open)try{conn.send(d)}catch(e){}}};
+  if(LOCAL){const me='c'+uid();const bc=new BroadcastChannel('cb-local-'+code);bc.onmessage=e=>{const m=e.data;if(m.to===me&&m.kind==='data')h.onData(m.d)};setTimeout(()=>h.onOpen(),50);return {send:d=>bc.postMessage({to:'host',from:me,kind:'data',d})}}
+  if(typeof mqtt==='undefined'){h.onError('nopeer');return null}
+  const me='c'+uid()+uid();const base=TOPIC+code;const all=[];let chosen=null,greeted=false;
+  // tous les relais en parallèle : on garde celui sur lequel l'hôte répond
+  BROKERS.forEach(b=>{const c=mqConnect(b,cc=>{cc.subscribe(base+'/c/'+me,()=>{if(chosen&&chosen!==cc)return;h.onOpen(cc)})},(t,m,cc)=>{
+      if(!chosen){chosen=cc;all.forEach(o=>{if(o!==cc)try{o.end(true)}catch(e){}})}
+      if(cc===chosen)h.onData(m)});all.push(c)});
+  setTimeout(()=>{if(!chosen)h.onError('notfound')},12000);
+  const pub=(c,d)=>{if(c&&c.connected)try{c.publish(base+'/h',JSON.stringify({from:me,d}))}catch(e){}};
+  return {send:(d,only)=>{if(only)return pub(only,d);if(chosen)pub(chosen,d);else all.forEach(c=>pub(c,d))}};
 }
 let net=null,isHost=false,hostPid=null,myPid=null,V=null;
-const connPid={};
+const connPid={};const sentSig={};
+let wake=null;
+function keepAwake(){const req=()=>{try{navigator.wakeLock&&navigator.wakeLock.request('screen').then(w=>{wake=w}).catch(()=>{})}catch(e){}};req();document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')req()})}
 function restore(game){G=game;B=G.B||null;L=G.L||null}
 function hostLoop(){
   setInterval(()=>{
@@ -875,27 +890,29 @@ function hostStart(code,game){
         if(!p){if(G.status!=='lobby')return net.send(id,{t:'err',msg:'La partie a déjà commencé. Attends la prochaine !'});
           if(G.players.length>=8)return net.send(id,{t:'err',msg:'Salon complet (8 joueurs).'});
           p=addPlayer(String(m.pid).slice(0,20),m.name,AVATARS.includes(m.av)?m.av:AVATARS[0],false)}
-        connPid[id]=p.id;p.online=true;p.last=Date.now();sync()}
+        connPid[id]=p.id;delete sentSig[id];p.online=true;p.last=Date.now();sync()}
       else if(m.t==='ping'){const p=P(connPid[id]);if(p){p.last=Date.now()}}
       else if(m.t==='act'){const pid=connPid[id];if(pid){const p=P(pid);if(p)p.last=Date.now();handleAct(pid,m.a||{})}}
     },
     onClose(id){const p=P(connPid[id]);delete connPid[id];if(p){p.online=Object.values(connPid).includes(p.id);sync()}},
-    onError(t){if(t==='taken'){status('Le code est encore réservé… nouvelle tentative.');setTimeout(()=>net&&net.retry&&net.retry(),2500)}else if(t==='nopeer')status('Impossible de charger le module réseau. Vérifie ta connexion internet puis recharge.',true);else status('Connexion au serveur de jeu perdue… reconnexion.',true)}
+    onError(t){if(t==='nopeer')status('Impossible de charger le module réseau. Vérifie ta connexion internet puis recharge.',true);else status('Impossible de joindre les relais de jeu. Vérifie la connexion internet de ce téléphone puis recharge la page.',true)}
   });
-  hostLoop();status('Ouverture du salon…');sync();
+  keepAwake();hostLoop();status('Ouverture du salon…');sync();
 }
 function soloStart(game){isHost=true;restore(game);hostPid=myPid;G.solo=true;hostLoop();sync()}
 function sync(){
   if(!G)return;
-  for(const [cid,pid] of Object.entries(connPid))net&&net.send(cid,{t:'view',v:viewFor(pid)});
+  const now=Date.now();
+  for(const [cid,pid] of Object.entries(connPid)){const v=viewFor(pid);const sig=JSON.stringify({...v,phase:v.phase&&{...v.phase,left:0}});const last=sentSig[cid];
+    if(!last||last.sig!==sig||now-last.t>4000){sentSig[cid]={sig,t:now};net&&net.send(cid,{t:'view',v})}}
   store.set('coupsbas-y-host',{G,hostPid});
   receive(viewFor(hostPid));
 }
 function clientStart(code,name,av){
   isHost=false;
   net=makeClientNet(code,{
-    onOpen(){status('');net.send({t:'hello',pid:myPid,name,av})},
-    onData(m){if(m.t==='view')receive(m.v);else if(m.t==='err')status(m.msg,true)},
+    onOpen(c){status('');net.send({t:'hello',pid:myPid,name,av},c)},
+    onData(m){if(m.t==='view'){if(ui.statusErr)status('');receive(m.v)}else if(m.t==='err')status(m.msg,true)},
     onClose(){status('Connexion perdue… reconnexion.',true)},
     onError(t){if(t==='notfound')status(`Salon ${code} introuvable. Vérifie le code : l’hôte doit garder la page ouverte.`,true);else if(t==='nopeer')status('Impossible de charger le module réseau. Vérifie ta connexion internet puis recharge.',true);else status('Problème de connexion… nouvelle tentative.',true)}
   });
@@ -1008,7 +1025,7 @@ function renderLobby(v){
       <div class="field" style="margin-top:12px"><span class="label">Jeu</span>${gamePicker(v.game,'data-set-game')}</div>
       <div class="field" style="margin-top:10px"><span class="label">Mode</span><div class="seg"><button data-set-mode="facile" aria-pressed="${v.mode==='facile'}">Facile<small>dès 10 ans</small></button><button data-set-mode="normal" aria-pressed="${v.mode==='normal'}">Normal<small>adultes</small></button></div></div>
       <button class="btn big" style="width:100%;margin-top:14px" data-a="start" ${v.players.length<min?'disabled':''}>Lancer ${GAMEINFO[v.game].n}</button>
-      <p class="small" style="color:var(--ink-2)">${v.players.length<min?`Il faut au moins ${min} joueurs : ajoute des robots si besoin.`:'Tout le monde est là ? Que le meilleur menteur gagne.'} Garde cette page ouverte : ton téléphone sert de serveur.</p>`
+      <p class="small" style="color:var(--ink-2)">${v.players.length<min?`Il faut au moins ${min} joueurs : ajoute des robots si besoin.`:'Tout le monde est là ? Que le meilleur menteur gagne.'} Garde cette page ouverte et l’écran allumé : ton téléphone sert de serveur.</p>`
     :`<p class="small" style="color:var(--ink-2);margin-top:12px">En attente du lancement par l'hôte…</p>`}
   </section>${statusEl()}${rulesHtml()}`;
   try{if(window.QRCode)new QRCode($('#qr'),{text:link,width:140,height:140,correctLevel:QRCode.CorrectLevel.M});else $('#qr').hidden=true}catch(e){$('#qr').hidden=true}
